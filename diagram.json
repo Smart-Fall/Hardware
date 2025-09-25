@@ -1,0 +1,53 @@
+{
+  "version": 1,
+  "author": "thao phan",
+  "editor": "wokwi",
+  "parts": [
+    { "type": "board-esp32-devkit-c-v4", "id": "esp", "top": 0, "left": -4.76, "attrs": {} },
+    {
+      "type": "wokwi-pushbutton",
+      "id": "btn1",
+      "top": 265.4,
+      "left": -105.6,
+      "rotate": 90,
+      "attrs": { "color": "red", "xray": "1" }
+    },
+    {
+      "type": "wokwi-buzzer",
+      "id": "bz1",
+      "top": -112.8,
+      "left": -132.6,
+      "attrs": { "volume": "0.1" }
+    },
+    {
+      "type": "wokwi-led",
+      "id": "led1",
+      "top": -109.2,
+      "left": 128.6,
+      "attrs": { "color": "red" }
+    },
+    { "type": "wokwi-gnd", "id": "gnd1", "top": 364.8, "left": -67.8, "attrs": {} },
+    {
+      "type": "wokwi-pushbutton",
+      "id": "btn2",
+      "top": 284.6,
+      "left": 115.2,
+      "rotate": 90,
+      "attrs": { "color": "green", "xray": "1" }
+    },
+    { "type": "wokwi-gnd", "id": "gnd2", "top": 374.4, "left": 153, "attrs": {} }
+  ],
+  "connections": [
+    [ "esp:TX", "$serialMonitor:RX", "", [] ],
+    [ "esp:RX", "$serialMonitor:TX", "", [] ],
+    [ "bz1:2", "esp:13", "green", [ "v0" ] ],
+    [ "bz1:1", "esp:GND.1", "green", [ "v0", "h-105.6", "v182.4" ] ],
+    [ "btn1:2.l", "esp:2", "green", [ "v-25.5", "h224.1", "v-67.2" ] ],
+    [ "btn1:1.r", "gnd1:GND", "green", [ "v0" ] ],
+    [ "btn2:2.l", "esp:4", "green", [ "v-25.5", "h41.7", "v-96" ] ],
+    [ "esp:16", "led1:A", "green", [ "h0" ] ],
+    [ "led1:C", "esp:GND.2", "green", [ "v0" ] ],
+    [ "btn2:1.r", "gnd2:GND", "green", [ "v0" ] ]
+  ],
+  "dependencies": {}
+}
