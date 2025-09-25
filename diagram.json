@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "author": "Anonymous maker",
+  "editor": "wokwi",
+  "parts": [
+    { "type": "board-esp32-devkit-c-v4", "id": "esp", "top": 0, "left": 0, "attrs": {} },
+    { "type": "wokwi-mpu6050", "id": "imu1", "top": 90.22, "left": -122.48, "attrs": {} },
+    {
+      "type": "wokwi-pushbutton",
+      "id": "btn1",
+      "top": 131,
+      "left": 182.4,
+      "attrs": { "color": "green", "xray": "1", "bounce": "1" }
+    }
+  ],
+  "connections": [
+    [ "esp:TX", "$serialMonitor:RX", "", [] ],
+    [ "esp:RX", "$serialMonitor:TX", "", [] ],
+    [ "imu1:VCC", "esp:3V3", "red", [ "v-67.2", "h0.08", "v0", "h48" ] ],
+    [ "imu1:GND", "esp:GND.2", "black", [ "v-105.6", "h172.88", "v38.4" ] ],
+    [ "imu1:SCL", "esp:22", "green", [ "v-124.8", "h201.68", "v76.8", "h-28.8" ] ],
+    [ "imu1:SDA", "esp:21", "green", [ "v-144", "h240.08", "v115.2" ] ],
+    [ "btn1:1.l", "esp:5", "green", [ "h-38.4", "v-28.8" ] ],
+    [ "btn1:2.r", "esp:GND.1", "green", [ "h0.2", "v77", "h-278.4", "v-86.4" ] ]
+  ],
+  "dependencies": {}
+}
