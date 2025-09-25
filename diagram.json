@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "author": "Uri Shaked",
+  "editor": "wokwi",
+  "parts": [
+    { "type": "wokwi-arduino-uno", "id": "uno", "top": -258.6, "left": -19.8, "attrs": {} },
+    { "type": "chip-i2c-counter", "id": "max30102", "top": 10.62, "left": 350.4, "attrs": {} }
+  ],
+  "connections": [
+    [ "max30102:VCC", "uno:5V", "red", [ "h-7.98", "v41.55", "h-138.19" ] ],
+    [ "max30102:GND", "uno:GND.2", "black", [ "h-12.36", "v43.36", "h-124.08" ] ],
+    [ "max30102:SDA", "uno:A4", "purple", [ "h-18.68", "v45.18", "h-41.85" ] ],
+    [ "max30102:SCL", "uno:A5", "orange", [ "h-25", "v47.96", "h-20.92" ] ],
+    [ "max30102:GND", "oled1:GND", "black", [ "h-423.44", "v-61.81", "h-20.58" ] ]
+  ],
+  "dependencies": {}
+}

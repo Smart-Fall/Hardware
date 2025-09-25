@@ -1,0 +1,26 @@
+{
+  "name": "Oximeter MAX30102",
+  "author": "Uri Shaked",
+  "pins": [
+    "INT",
+    "SCL",
+    "SDA",
+    "GND",
+    "VCC",
+    "",
+    "",
+    "",
+    "",
+    ""
+  ],
+  "controls": [
+    {
+      "id": "beatAvg",
+      "label": "BPM",
+      "type": "range",
+      "min": 1,
+      "max": 180,
+      "step": 1
+    }
+  ]
+}
