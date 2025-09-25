@@ -33,9 +33,9 @@
 #include <math.h>
 
 // ---------- Pins ----------
-const int SDA_PIN = 21;   // I2C SDA
-const int SCL_PIN = 22;   // I2C SCL
-const int BTN_PIN = 5;    // pushbutton to GND (INPUT_PULLUP)
+const int SDA_PIN = 23;   // ESP32 Feather
+const int SCL_PIN = 22;   // ESP32 Feather
+//const int BTN_PIN = 5;    // pushbutton to GND (INPUT_PULLUP)
 
 Adafruit_MPU6050 mpu;
 
