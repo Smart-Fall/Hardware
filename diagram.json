@@ -1,0 +1,256 @@
+{
+  "version": 1,
+  "author": "SmartFall Development Team",
+  "editor": "wokwi",
+  "parts": [
+    {
+      "type": "wokwi-esp32-devkit-v1",
+      "id": "esp",
+      "top": 0,
+      "left": 0,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-mpu6050",
+      "id": "imu",
+      "top": -67.2,
+      "left": 153.6,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-dht22",
+      "id": "env_sensor",
+      "top": -67.2,
+      "left": 297.6,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-potentiometer",
+      "id": "heart_rate_sim",
+      "top": -105.6,
+      "left": 422.4,
+      "attrs": {
+        "value": "512"
+      }
+    },
+    {
+      "type": "wokwi-potentiometer",
+      "id": "fsr_sim",
+      "top": -28.8,
+      "left": 422.4,
+      "attrs": {
+        "value": "0"
+      }
+    },
+    {
+      "type": "wokwi-pushbutton",
+      "id": "sos_button",
+      "top": 48,
+      "left": 422.4,
+      "attrs": {
+        "color": "red"
+      }
+    },
+    {
+      "type": "wokwi-led",
+      "id": "audio_alert_led",
+      "top": 124.8,
+      "left": 422.4,
+      "attrs": {
+        "color": "yellow"
+      }
+    },
+    {
+      "type": "wokwi-led",
+      "id": "haptic_alert_led",
+      "top": 124.8,
+      "left": 460.8,
+      "attrs": {
+        "color": "blue"
+      }
+    },
+    {
+      "type": "wokwi-led",
+      "id": "visual_alert_led",
+      "top": 124.8,
+      "left": 499.2,
+      "attrs": {
+        "color": "red"
+      }
+    },
+    {
+      "type": "wokwi-lcd1602",
+      "id": "display",
+      "top": -163.2,
+      "left": 134.4,
+      "attrs": {
+        "pins": "i2c"
+      }
+    }
+  ],
+  "connections": [
+    [
+      "esp:TX0",
+      "$serialMonitor:RX",
+      "",
+      []
+    ],
+    [
+      "esp:RX0",
+      "$serialMonitor:TX",
+      "",
+      []
+    ],
+    [
+      "imu:VCC",
+      "esp:3V3",
+      "red",
+      ["h0"]
+    ],
+    [
+      "imu:GND",
+      "esp:GND.1",
+      "black",
+      ["h0"]
+    ],
+    [
+      "imu:SDA",
+      "esp:D21",
+      "green",
+      ["h0"]
+    ],
+    [
+      "imu:SCL",
+      "esp:D22",
+      "blue",
+      ["h0"]
+    ],
+    [
+      "env_sensor:VCC",
+      "esp:3V3",
+      "red",
+      ["h0"]
+    ],
+    [
+      "env_sensor:GND",
+      "esp:GND.1",
+      "black",
+      ["h0"]
+    ],
+    [
+      "env_sensor:SDA",
+      "esp:D4",
+      "green",
+      ["h0"]
+    ],
+    [
+      "heart_rate_sim:VCC",
+      "esp:3V3",
+      "red",
+      ["h0"]
+    ],
+    [
+      "heart_rate_sim:GND",
+      "esp:GND.2",
+      "black",
+      ["h0"]
+    ],
+    [
+      "heart_rate_sim:SIG",
+      "esp:A0",
+      "yellow",
+      ["h0"]
+    ],
+    [
+      "fsr_sim:VCC",
+      "esp:3V3",
+      "red",
+      ["h0"]
+    ],
+    [
+      "fsr_sim:GND",
+      "esp:GND.2",
+      "black",
+      ["h0"]
+    ],
+    [
+      "fsr_sim:SIG",
+      "esp:A3",
+      "orange",
+      ["h0"]
+    ],
+    [
+      "sos_button:1.l",
+      "esp:D38",
+      "purple",
+      ["h0"]
+    ],
+    [
+      "sos_button:2.l",
+      "esp:GND.2",
+      "black",
+      ["h0"]
+    ],
+    [
+      "audio_alert_led:A",
+      "esp:D25",
+      "yellow",
+      ["h0"]
+    ],
+    [
+      "audio_alert_led:C",
+      "esp:GND.2",
+      "black",
+      ["h0"]
+    ],
+    [
+      "haptic_alert_led:A",
+      "esp:D26",
+      "blue",
+      ["h0"]
+    ],
+    [
+      "haptic_alert_led:C",
+      "esp:GND.2",
+      "black",
+      ["h0"]
+    ],
+    [
+      "visual_alert_led:A",
+      "esp:D27",
+      "red",
+      ["h0"]
+    ],
+    [
+      "visual_alert_led:C",
+      "esp:GND.2",
+      "black",
+      ["h0"]
+    ],
+    [
+      "display:VCC",
+      "esp:3V3",
+      "red",
+      ["h0"]
+    ],
+    [
+      "display:GND",
+      "esp:GND.1",
+      "black",
+      ["h0"]
+    ],
+    [
+      "display:SDA",
+      "esp:D21",
+      "green",
+      ["h0"]
+    ],
+    [
+      "display:SCL",
+      "esp:D22",
+      "blue",
+      ["h0"]
+    ]
+  ],
+  "dependencies": {}
+}

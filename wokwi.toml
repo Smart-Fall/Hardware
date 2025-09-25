@@ -1,0 +1,17 @@
+[wokwi]
+version = 1
+firmware = '.pio/build/esp32dev/firmware.bin'
+elf = '.pio/build/esp32dev/firmware.elf'
+
+# Optional: Enable serial port forwarding via RFC2217
+# This allows connecting to the serial port from external tools
+rfc2217ServerPort = 4000
+
+# Optional: Enable GDB debugging
+# gdbServerPort = 3333
+
+# Optional: Enable WiFi simulation (if needed for future features)
+# [net]
+# [[net.forward]]
+# from = "localhost:8180"
+# to = "target:80"
