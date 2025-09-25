@@ -15,7 +15,7 @@ A comprehensive IoT solution for real-time fall detection using multi-sensor dat
 1. **Build firmware locally**: `pio run -e esp32dev`
 2. **Open Wokwi simulator** at [https://wokwi.com](https://wokwi.com)
 3. **Create new ESP32 project** and replace code with `src/main.cpp`
-4. **Import the circuit** using `wokwi-project.json`
+4. **Import the circuit** using `diagram.json`
 5. **Upload firmware**: Use the generated `.bin` file from `.pio/build/esp32dev/`
 
 ### Key Simulation Components
