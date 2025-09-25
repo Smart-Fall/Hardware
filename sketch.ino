@@ -5,8 +5,8 @@
   Sensor: MPU6050 breakout (has both accelerometer & gyroscope)
     - VCC  -> ESP32 3V3
     - GND  -> ESP32 GND
-    - SDA  -> ESP32 GPIO21   (I2C SDA)
-    - SCL  -> ESP32 GPIO22   (I2C SCL)
+    - SDA  -> ESP32 GPIO23   (I2C SDA)
+    - SCL  -> ESP32 GPIO23   (I2C SCL)
 
   Pushbutton (to switch modes)
     - One leg -> ESP32 GPIO5
