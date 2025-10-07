@@ -1,45 +1,108 @@
 # SmartFall Wearable Fall Detection System
 
-A comprehensive IoT solution for real-time fall detection using multi-sensor data fusion and emergency alert capabilities. Designed for ESP32 Feather V2 with simulation-first development approach using Wokwi.
+A comprehensive IoT solution for real-time fall detection using multi-sensor data fusion and emergency alert capabilities for ESP32 HUZZAH32 Feather.
 
-## 🚀 Quick Start with Wokwi Simulation
+## 🚀 Quick Start
 
-### Method 1: VSCode with Wokwi Extension (Recommended)
-1. **Install PlatformIO extension** in VSCode
-2. **Install Wokwi extension** in VSCode
-3. **Open project** in VSCode
-4. **Build the project**: Press Ctrl+Shift+P → "PlatformIO: Build"
-5. **Start Wokwi simulation**: Press F1 → "Wokwi: Start Simulator"
+### Arduino CLI Setup (Recommended)
 
-### Method 2: Online Wokwi Simulator
-1. **Build firmware locally**: `pio run -e esp32dev`
-2. **Open Wokwi simulator** at [https://wokwi.com](https://wokwi.com)
-3. **Create new ESP32 project** and replace code with `src/main.cpp`
-4. **Import the circuit** using `diagram.json`
-5. **Upload firmware**: Use the generated `.bin` file from `.pio/build/esp32dev/`
+#### Linux/Ubuntu Installation
+```bash
+# Install Arduino CLI
+curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | sh
+export PATH=$PATH:$HOME/bin
 
-### Key Simulation Components
-- **ESP32 DevKit V1** (simulating ESP32 Feather V2)
-- **MPU6050** (simulating BMI-323 6-axis IMU)
-- **DHT22** (simulating BMP-280 pressure sensor)
-- **2x Potentiometers** (simulating MAX30102 heart rate & FSR sensors)
-- **Push Button** (SOS emergency trigger)
-- **3x LEDs** (Alert system indicators: Audio/Haptic/Visual)
-- **LCD1602** (Optional status display)
+# Setup ESP32 and libraries
+arduino-cli config init
+arduino-cli core update-index
+arduino-cli core install esp32:esp32
+arduino-cli lib install "Adafruit MPU6050" "Adafruit BMP280 Library" \
+  "SparkFun MAX3010x Pulse and Proximity Sensor Library" \
+  "Adafruit Unified Sensor" "Adafruit DRV2605 Library" \
+  "Adafruit GFX Library" "Adafruit SSD1306"
+
+# Fix serial port permissions
+sudo usermod -a -G dialout $USER
+# Log out and back in
+```
+
+#### Windows PowerShell Installation
+```powershell
+# Download and install
+Invoke-WebRequest -Uri "https://downloads.arduino.cc/arduino-cli/arduino-cli_latest_Windows_64bit.zip" -OutFile "$env:TEMP\arduino-cli.zip"
+Expand-Archive -Path "$env:TEMP\arduino-cli.zip" -DestinationPath "C:\arduino-cli"
+[Environment]::SetEnvironmentVariable("Path", $env:Path + ";C:\arduino-cli", "Machine")
+
+# Restart PowerShell, then setup
+arduino-cli config init
+arduino-cli core update-index
+arduino-cli core install esp32:esp32
+arduino-cli lib install "Adafruit MPU6050"
+arduino-cli lib install "Adafruit BMP280 Library"
+arduino-cli lib install "SparkFun MAX3010x Pulse and Proximity Sensor Library"
+arduino-cli lib install "Adafruit Unified Sensor"
+```
+
+### Build and Upload
+```bash
+cd SmartFall
+
+# Compile
+arduino-cli compile --fqbn esp32:esp32:featheresp32 .
+
+# List available ports
+arduino-cli board list
+
+# Upload (Linux: /dev/ttyUSB0, Windows: COM3)
+arduino-cli upload -p PORT --fqbn esp32:esp32:featheresp32 .
+
+# Monitor serial output (115200 baud)
+arduino-cli monitor -p PORT -c baudrate=115200
+```
+
+**Port Configuration:**
+- Edit `SmartFall/sketch.yaml` to set your default port
+- Linux: `/dev/ttyUSB0` or `/dev/ttyACM0`
+- Windows: `COM3` (check Device Manager)
+
+## 🎯 Hardware Components
+
+### Required Sensors
+- **ESP32 HUZZAH32 Feather** (Adafruit)
+- **MPU6050** - 6-axis IMU (I2C)
+- **BMP280** - Barometric pressure sensor (I2C)
+
+### Optional Components
+- **MAX30102** - Heart rate sensor (I2C)
+- **FSR** - Force sensitive resistor (Analog)
+- **Push button** - SOS emergency button (GPIO 15)
+- **LEDs/Speaker** - Alert outputs
+
+### I2C Wiring (All sensors share same bus)
+| Sensor | VCC | GND | SDA | SCL |
+|--------|-----|-----|-----|-----|
+| MPU6050 | 3.3V | GND | GPIO 23 | GPIO 22 |
+| BMP280 | 3.3V | GND | GPIO 23 | GPIO 22 |
+| MAX30102 | 3.3V | GND | GPIO 23 | GPIO 22 |
 
 ## 🎯 How to Test Fall Detection
 
-### Simulating Fall Events
-1. **Stage 1 - Free Fall**: Adjust MPU6050 readings to show <0.5g acceleration
-2. **Stage 2 - Impact**: Create acceleration spike >3.0g within 1 second
-3. **Stage 3 - Rotation**: Generate angular velocity >250°/s
-4. **Stage 4 - Inactivity**: Maintain stable position ~1g for 2+ seconds
-5. **Confidence Scoring**: System will calculate 105-point confidence score
+### Real Hardware Testing
+1. **Manual Testing**: Rapidly move/shake the device to trigger acceleration thresholds
+2. **Monitor Serial Output**: Watch for stage progression in serial monitor
+3. **SOS Button**: Press GPIO 15 button for immediate emergency alert
 
-### Manual Emergency Test
-- **Press red SOS button** to trigger immediate emergency alert
-- All alert LEDs will activate instantly
-- System bypasses detection stages for manual activation
+### Individual Sensor Testing
+Test each sensor independently using modules in `SmartFall/` directory:
+```bash
+# Test MPU6050 only
+arduino-cli compile --fqbn esp32:esp32:featheresp32 SmartFall/MPU6050
+arduino-cli upload -p PORT --fqbn esp32:esp32:featheresp32 SmartFall/MPU6050
+
+# Test BMP280 only
+arduino-cli compile --fqbn esp32:esp32:featheresp32 SmartFall/BMP280
+arduino-cli upload -p PORT --fqbn esp32:esp32:featheresp32 SmartFall/BMP280
+```
 
 ## 📊 System Architecture
 
@@ -59,55 +122,78 @@ Total: 105 points possible
 - **50-69 points**: POTENTIAL FALL → Enhanced monitoring
 - **<50 points**: Continue monitoring or reset
 
-### Hardware Abstraction
-The project uses simulation-friendly component mapping:
-- **Real Hardware**: BMI-323, BMP-280, MAX30102, FSR sensors
-- **Wokwi Simulation**: MPU6050, DHT22, Potentiometers
-- **Same Code Base**: Hardware abstraction layer enables seamless migration
+### Modular Design
+- **Individual sensor testing** with standalone test sketches
+- **Unified main sketch** for complete fall detection system
+- **Hardware abstraction** for easy sensor substitution
+- **Configurable thresholds** via `utils/config.h`
 
-## 🛠️ Development Commands
+## 🛠️ Development Tools
 
-### PlatformIO Commands
+### Arduino CLI Commands
 ```bash
-# Build for Wokwi simulation
-pio run -e esp32dev
+# Compile main sketch
+arduino-cli compile --fqbn esp32:esp32:featheresp32 SmartFall
 
-# Build for real ESP32 Feather V2
-pio run -e esp32featherv2
+# Upload to board
+arduino-cli upload -p PORT --fqbn esp32:esp32:featheresp32 SmartFall
+
+# Serial monitor
+arduino-cli monitor -p PORT -c baudrate=115200
+
+# List connected boards
+arduino-cli board list
+```
+
+### PlatformIO (Alternative)
+```bash
+# Build for ESP32 HUZZAH32
+pio run -e huzzah32
 
 # Upload and monitor
 pio run -t upload && pio device monitor
-
-# Clean build
-pio run -t clean
 ```
 
 ### Configuration Files
-- **`platformio.ini`**: Build configuration for both simulation and hardware
-- **`wokwi.toml`**: Wokwi project configuration and firmware paths
-- **`wokwi-project.json`**: Wokwi circuit definition and component wiring
-- **`src/utils/config.h`**: System constants and pin definitions
+- **`SmartFall/sketch.yaml`**: Arduino CLI project configuration
+- **`platformio.ini`**: PlatformIO build configuration
+- **`SmartFall/utils/config.h`**: System constants and pin definitions
+- **`partitions.csv`**: ESP32 flash partition table
 
 ## 📁 Project Structure
 
 ```
-SmartFall/
-├── src/
-│   ├── main.cpp                    # System coordinator and main loop
-│   ├── sensors/                    # Hardware abstraction modules
-│   │   ├── bmi323_sensor.cpp/.h    # IMU sensor (MPU6050 simulation)
-│   │   ├── bmp280_sensor.cpp/.h    # Pressure sensor (DHT22 simulation)
-│   │   ├── max30102_sensor.cpp/.h  # Heart rate (potentiometer simulation)
-│   │   └── fsr_sensor.cpp/.h       # Force sensor (potentiometer simulation)
-│   ├── detection/                  # Fall detection algorithm
-│   │   ├── fall_detector.cpp/.h    # Multi-stage detection logic
-│   │   └── confidence_scorer.cpp/.h # Confidence scoring system
-│   └── utils/                      # Shared utilities
-│       ├── config.h                # System constants and pin definitions
-│       └── data_types.h            # Common data structures
-├── platformio.ini                  # Build configuration
-├── wokwi-project.json             # Wokwi simulation setup
-└── CLAUDE.md                      # Claude Code integration guide
+Hardware/
+├── SmartFall/                      # Main Arduino sketch directory
+│   ├── SmartFall.ino              # Main fall detection sketch
+│   ├── sketch.yaml                # Arduino CLI configuration
+│   ├── *.cpp                      # Implementation files (Arduino requirement)
+│   │
+│   ├── sensors/                   # Sensor header files
+│   │   ├── MPU6050_Sensor.h
+│   │   ├── BMP280_Sensor.h
+│   │   ├── MAX30102_Sensor.h
+│   │   └── FSR_Sensor.h
+│   │
+│   ├── detection/                 # Fall detection algorithm
+│   │   ├── fall_detector.h/cpp
+│   │   └── confidence_scorer.h/cpp
+│   │
+│   ├── utils/                     # Configuration
+│   │   ├── config.h               # Pin definitions and thresholds
+│   │   └── data_types.h           # Data structures
+│   │
+│   └── Individual Test Modules:
+│       ├── MPU6050/               # MPU6050 standalone test
+│       ├── BMP280/                # BMP280 standalone test
+│       ├── MAX30102/              # MAX30102 standalone test
+│       └── FSR/                   # FSR standalone test
+│
+├── README.md                       # This file
+├── FallDetectionAlgorithm.md       # Algorithm documentation
+├── Code Structure and Development Guidelines.md
+├── platformio.ini                  # PlatformIO configuration (optional)
+└── partitions.csv                  # ESP32 partition table
 ```
 
 ## 🔧 Key Features
