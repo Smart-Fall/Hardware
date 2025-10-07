@@ -6,7 +6,7 @@ A comprehensive IoT solution for real-time fall detection using multi-sensor dat
 
 ### Arduino CLI Setup (Recommended)
 
-#### Linux/Ubuntu Installation
+#### Linux/Ubuntu Installation (Not recommended if using WSL)
 ```bash
 # Install Arduino CLI
 curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | sh
