@@ -9,10 +9,13 @@ version: 1.0.0
 default_fqbn: esp32:esp32:featheresp32
 
 # Default port (Linux/macOS)
-default_port: /dev/ttyUSB0
+# default_port: /dev/ttyUSB0
 # For Windows, use: COM3, COM4, COM5, etc.
 # Uncomment and modify the line below for Windows:
-# default_port: COM3
+default_port: COM5
+
+# Set default monitor baud rate
+monitor_speed: 115200
 
 # Profiles for different build configurations
 profiles:
@@ -20,8 +23,10 @@ profiles:
     fqbn: esp32:esp32:featheresp32
     build_properties:
       - build.extra_flags=-DDEBUG_ENABLED=1
+    monitor_speed: 115200
 
   release:
     fqbn: esp32:esp32:featheresp32
     build_properties:
       - build.extra_flags=-DDEBUG_ENABLED=0
+    monitor_speed: 115200
