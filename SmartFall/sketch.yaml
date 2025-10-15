@@ -1,0 +1,32 @@
+# SmartFall Arduino Sketch Configuration
+# This file helps Arduino CLI understand the project structure
+
+# Project metadata
+name: SmartFall_Arduino
+version: 1.0.0
+
+# Default FQBN (Fully Qualified Board Name)
+default_fqbn: esp32:esp32:featheresp32
+
+# Default port (Linux/macOS)
+# default_port: /dev/ttyUSB0
+# For Windows, use: COM3, COM4, COM5, etc.
+# Uncomment and modify the line below for Windows:
+default_port: COM5
+
+# Set default monitor baud rate
+monitor_speed: 115200
+
+# Profiles for different build configurations
+profiles:
+  debug:
+    fqbn: esp32:esp32:featheresp32
+    build_properties:
+      - build.extra_flags=-DDEBUG_ENABLED=1
+    monitor_speed: 115200
+
+  release:
+    fqbn: esp32:esp32:featheresp32
+    build_properties:
+      - build.extra_flags=-DDEBUG_ENABLED=0
+    monitor_speed: 115200
