@@ -6,7 +6,10 @@ name: SmartFall_Arduino
 version: 1.0.0
 
 # Default FQBN (Fully Qualified Board Name)
-default_fqbn: esp32:esp32:featheresp32
+# Choose based on your board:
+# - ESP32 Feather V2: esp32:esp32:adafruit_feather_esp32_v2
+# - ESP32 HUZZAH32 Feather: esp32:esp32:featheresp32
+default_fqbn: esp32:esp32:adafruit_feather_esp32_v2
 
 # Default port (Linux/macOS)
 # default_port: /dev/ttyUSB0
@@ -19,6 +22,20 @@ monitor_speed: 115200
 
 # Profiles for different build configurations
 profiles:
+  # ESP32 Feather V2 profiles
+  v2-debug:
+    fqbn: esp32:esp32:adafruit_feather_esp32_v2
+    build_properties:
+      - build.extra_flags=-DDEBUG_ENABLED=1
+    monitor_speed: 115200
+
+  v2-release:
+    fqbn: esp32:esp32:adafruit_feather_esp32_v2
+    build_properties:
+      - build.extra_flags=-DDEBUG_ENABLED=0
+    monitor_speed: 115200
+
+  # ESP32 HUZZAH32 Feather profiles
   debug:
     fqbn: esp32:esp32:featheresp32
     build_properties:

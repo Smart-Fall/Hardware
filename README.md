@@ -35,9 +35,7 @@ export PATH=$PATH:$HOME/bin
 arduino-cli config init
 arduino-cli core update-index
 arduino-cli core install esp32:esp32
-arduino-cli lib install "Adafruit MPU6050" "Adafruit BMP280 Library" \
-  "SparkFun MAX3010x Pulse and Proximity Sensor Library" \
-  "Adafruit Unified Sensor" "ArduinoJson"
+arduino-cli lib install "Adafruit MPU6050" "Adafruit BMP280 Library" "SparkFun MAX3010x Pulse and Proximity Sensor Library" "Adafruit Unified Sensor" "ArduinoJson"
 
 # Fix serial port permissions
 sudo usermod -a -G dialout $USER
@@ -282,12 +280,34 @@ Go to **Tools → Manage Libraries** and install:
 
 ### Option 3: PlatformIO (Alternative)
 
+**For ESP32 Feather V2:**
 ```bash
-# Build for ESP32 HUZZAH32
+# Build
+pio run -e feather_esp32_v2
+
+# Upload
+pio run -e feather_esp32_v2 -t upload
+
+# Monitor
+pio device monitor
+
+# Build, upload, and monitor
+pio run -e feather_esp32_v2 -t upload && pio device monitor
+```
+
+**For ESP32 HUZZAH32 Feather:**
+```bash
+# Build
 pio run -e huzzah32
 
-# Upload and monitor
-pio run -t upload && pio device monitor
+# Upload
+pio run -e huzzah32 -t upload
+
+# Monitor
+pio device monitor
+
+# Build, upload, and monitor
+pio run -e huzzah32 -t upload && pio device monitor
 ```
 
 ---
