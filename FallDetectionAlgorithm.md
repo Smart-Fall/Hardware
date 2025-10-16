@@ -10,7 +10,7 @@
 
 ## 1. Executive Summary
 
-The SmartFall detection algorithm employs a multi-stage decision tree approach that analyzes data from multiple sensors to accurately detect fall events while minimizing false positives. The algorithm processes inputs from accelerometer, gyroscope, pressure, heart rate, and optional force sensors through a confidence-based scoring system that culminates in emergency alert activation.
+The SmartFall detection algorithm employs a multi-stage decision tree approach that analyzes data from multiple sensors to accurately detect fall events while minimizing false positives. The algorithm processes inputs from accelerometer, gyroscope, pressure, heart rate, and force sensors through a confidence-based scoring system that culminates in emergency alert activation.
 
 ## 2. System Overview
 
@@ -18,7 +18,7 @@ The SmartFall detection algorithm employs a multi-stage decision tree approach t
 - **BMI-323**: 3-axis accelerometer and gyroscope (primary fall detection)
 - **BMP-280**: Barometric pressure sensor (altitude change detection)
 - **MAX30102**: Heart rate sensor (physiological validation)
-- **Analog FSR**: Force sensitive resistor (optional impact/strap detection)
+- **Analog FSR**: Force sensitive resistor (impact/strap detection)
 - **SOS Button**: Manual emergency override (continuous monitoring)
 - **ESP32 Feather V2**: Main controller (240MHz dual-core, 8MB Flash, 2MB PSRAM)
 
@@ -148,7 +148,7 @@ The algorithm operates in a continuous monitoring loop with the following stages
   - HR spike > 30 BPM above baseline: +5 points
 - **Purpose**: Correlate physiological stress response with fall event
 
-#### Filter C: Device Attachment Validation (Optional FSR)
+#### Filter C: Device Attachment Validation (FSR)
 **Logic**: Confirm device remains attached to user throughout sequence
 - **Scoring**:
   - Consistent strap tension maintained: +2 points

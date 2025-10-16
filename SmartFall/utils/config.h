@@ -33,9 +33,23 @@
 #define DISPLAY_ADDRESS            0x3C  // OLED I2C address
 
 // WiFi Configuration
-#define WIFI_SSID                  ""
-#define WIFI_PASSWORD              ""
+#define WIFI_SSID                  "Your_WiFi_SSID"
+#define WIFI_PASSWORD              "Your_WiFi_Password"
 #define WIFI_TIMEOUT_MS            10000
+#define WIFI_RECONNECT_INTERVAL_MS 30000
+#define WIFI_MAX_RECONNECT_ATTEMPTS 5
+
+// Server Configuration
+#define SERVER_URL                 "http://your-server.com"  // Your alert server URL
+#define SERVER_PORT                80
+
+// BLE Configuration
+#define BLE_DEVICE_NAME            "SmartFall"
+#define BLE_STREAMING_INTERVAL_MS  1000   // Sensor data streaming rate
+
+// Emergency Alert Configuration
+#define EMERGENCY_MAX_RETRIES      3
+#define EMERGENCY_RETRY_INTERVAL_MS 5000
 
 // Timing constants
 #define MAIN_LOOP_DELAY_MS         10    // 100Hz main loop
@@ -48,6 +62,13 @@
 #define ALERT_BEEP_INTERVAL_MS     1000
 #define HAPTIC_DURATION_MS         5000
 #define COUNTDOWN_DURATION_S       30
+
+// Audio Configuration (PAM8302 Amplifier)
+#define AUDIO_DEFAULT_VOLUME       80     // 0-100, default volume level
+#define AUDIO_PWM_CHANNEL          0      // ESP32 PWM channel for audio
+#define AUDIO_PWM_FREQUENCY        5000   // Base PWM frequency (Hz)
+#define AUDIO_PWM_RESOLUTION       8      // PWM resolution (bits)
+#define AUDIO_ENABLE_VOICE_ALERTS  true   // Enable voice-like alert sequences
 
 // Confidence scoring constants
 #define MAX_CONFIDENCE_SCORE       105
