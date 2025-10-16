@@ -61,6 +61,8 @@ arduino-cli lib install "Adafruit MPU6050" "Adafruit BMP280 Library" \
 ```
 
 ### Build and Upload
+
+#### For ESP32 HUZZAH32 Feather (Original)
 ```bash
 cd SmartFall
 
@@ -77,6 +79,23 @@ arduino-cli upload -p PORT --fqbn esp32:esp32:featheresp32 .
 arduino-cli monitor -p PORT -c baudrate=115200
 ```
 
+#### For ESP32 Feather V2 (USB-C, 8MB Flash, 2MB PSRAM)
+```bash
+cd SmartFall
+
+# Compile
+arduino-cli compile --fqbn esp32:esp32:adafruit_feather_esp32_v2 .
+
+# List available ports
+arduino-cli board list
+
+# Upload
+arduino-cli upload -p PORT --fqbn esp32:esp32:adafruit_feather_esp32_v2 .
+
+# Monitor serial output (115200 baud)
+arduino-cli monitor -p PORT -c baudrate=115200
+```
+
 **Port Configuration:**
 - Edit `SmartFall/sketch.yaml` to set your default port
 - Linux: `/dev/ttyUSB0` or `/dev/ttyACM0`
@@ -87,7 +106,26 @@ arduino-cli monitor -p PORT -c baudrate=115200
 ## 🎯 Hardware Components
 
 ### Required Components
-- **ESP32 HUZZAH32 Feather** (Adafruit) - Main microcontroller
+
+#### Microcontroller (Choose One)
+- **ESP32 Feather V2** (Adafruit #5400)
+  - USB Type-C
+  - 8MB Flash (double the original)
+  - 2MB PSRAM (new addition)
+  - Enhanced low-power: 70µA deep sleep
+  - Built-in NeoPixel RGB LED
+  - STEMMA QT connector for easy I2C
+  - Product page: https://www.adafruit.com/product/5400
+
+- **ESP32 HUZZAH32 Feather** (Adafruit #3405)
+  - Micro USB
+  - 4MB Flash
+  - No PSRAM
+  - Product page: https://www.adafruit.com/product/3405
+
+**Note:** Both boards are fully compatible with this project. Choose based on availability and features needed.
+
+#### Sensors & Components
 - **MPU6050** - 6-axis IMU (accelerometer + gyroscope) - I2C
 - **BMP280** - Barometric pressure sensor - I2C
 - **MAX30102** - Heart rate sensor - I2C
@@ -100,7 +138,7 @@ arduino-cli monitor -p PORT -c baudrate=115200
 ### Optional Components
 - **Haptic motor** - Vibration feedback
 - **OLED display** - System status display
-- **Battery** - LiPo battery for portable operation
+- **Battery** - LiPo battery for portable operation (JST connector on both boards)
 
 ---
 
@@ -221,6 +259,7 @@ Go to **Tools → Manage Libraries** and install:
 
 #### 3. Board Configuration
 
+**For ESP32 HUZZAH32 Feather (Original):**
 1. **Select Board**: Tools → Board → ESP32 Arduino → **"Adafruit ESP32 Feather"**
 2. **Upload Speed**: Tools → Upload Speed → **921600**
 3. **Flash Frequency**: Tools → Flash Frequency → **80MHz**
@@ -228,6 +267,17 @@ Go to **Tools → Manage Libraries** and install:
 5. **Port**: Tools → Port → Select your USB port
    - Linux: `/dev/ttyUSB0` or `/dev/ttyACM0`
    - Mac: `/dev/cu.usbserial-*`
+   - Windows: `COM3` (or similar)
+
+**For ESP32 Feather V2:**
+1. **Select Board**: Tools → Board → ESP32 Arduino → **"Adafruit Feather ESP32 V2"**
+2. **Upload Speed**: Tools → Upload Speed → **921600**
+3. **Flash Frequency**: Tools → Flash Frequency → **80MHz**
+4. **Partition Scheme**: Tools → Partition Scheme → **"Default 4MB with spiffs (1.2MB APP/1.5MB SPIFFS)"** or **"8M with spiffs"** for V2
+5. **PSRAM**: Tools → PSRAM → **"Enabled"** (V2 only - takes advantage of 2MB PSRAM)
+6. **Port**: Tools → Port → Select your USB port
+   - Linux: `/dev/ttyUSB0` or `/dev/ttyACM0`
+   - Mac: `/dev/cu.usbserial-*` or `/dev/cu.wchusbserial*`
    - Windows: `COM3` (or similar)
 
 ### Option 3: PlatformIO (Alternative)
@@ -291,10 +341,20 @@ GND ────────────────── A- (Audio Input-)
 ### Quick Test: Main System
 
 1. **Upload Main Sketch**
+
+   **For ESP32 HUZZAH32 Feather (Original):**
    ```bash
    cd SmartFall
    arduino-cli compile --fqbn esp32:esp32:featheresp32 .
    arduino-cli upload -p PORT --fqbn esp32:esp32:featheresp32 .
+   arduino-cli monitor -p PORT -c baudrate=115200
+   ```
+
+   **For ESP32 Feather V2:**
+   ```bash
+   cd SmartFall
+   arduino-cli compile --fqbn esp32:esp32:adafruit_feather_esp32_v2 .
+   arduino-cli upload -p PORT --fqbn esp32:esp32:adafruit_feather_esp32_v2 .
    arduino-cli monitor -p PORT -c baudrate=115200
    ```
 
@@ -325,43 +385,51 @@ GND ────────────────── A- (Audio Input-)
 
 ### Individual Component Testing
 
-Test each component individually before running the complete system:
+Test each component individually before running the complete system.
+
+**Note:** Replace `BOARD_FQBN` with:
+- `esp32:esp32:featheresp32` for ESP32 HUZZAH32 Feather (Original)
+- `esp32:esp32:adafruit_feather_esp32_v2` for ESP32 Feather V2
 
 ```bash
+# Set your board FQBN (choose one)
+BOARD_FQBN="esp32:esp32:adafruit_feather_esp32_v2"  # For V2
+# BOARD_FQBN="esp32:esp32:featheresp32"              # For Original
+
 # Test MPU6050 (IMU)
 cd SmartFall/tests/MPU6050
-arduino-cli compile --fqbn esp32:esp32:featheresp32 .
-arduino-cli upload -p PORT --fqbn esp32:esp32:featheresp32 .
+arduino-cli compile --fqbn $BOARD_FQBN .
+arduino-cli upload -p PORT --fqbn $BOARD_FQBN .
 
 # Test BMP280 (Pressure)
 cd ../BMP280
-arduino-cli compile --fqbn esp32:esp32:featheresp32 .
-arduino-cli upload -p PORT --fqbn esp32:esp32:featheresp32 .
+arduino-cli compile --fqbn $BOARD_FQBN .
+arduino-cli upload -p PORT --fqbn $BOARD_FQBN .
 
 # Test MAX30102 (Heart Rate)
 cd ../MAX30102
-arduino-cli compile --fqbn esp32:esp32:featheresp32 .
-arduino-cli upload -p PORT --fqbn esp32:esp32:featheresp32 .
+arduino-cli compile --fqbn $BOARD_FQBN .
+arduino-cli upload -p PORT --fqbn $BOARD_FQBN .
 
 # Test FSR (Force Sensor)
 cd ../FSR
-arduino-cli compile --fqbn esp32:esp32:featheresp32 .
-arduino-cli upload -p PORT --fqbn esp32:esp32:featheresp32 .
+arduino-cli compile --fqbn $BOARD_FQBN .
+arduino-cli upload -p PORT --fqbn $BOARD_FQBN .
 
 # Test WiFi
 cd ../WiFi
-arduino-cli compile --fqbn esp32:esp32:featheresp32 .
-arduino-cli upload -p PORT --fqbn esp32:esp32:featheresp32 .
+arduino-cli compile --fqbn $BOARD_FQBN .
+arduino-cli upload -p PORT --fqbn $BOARD_FQBN .
 
 # Test BLE
 cd ../BLE
-arduino-cli compile --fqbn esp32:esp32:featheresp32 .
-arduino-cli upload -p PORT --fqbn esp32:esp32:featheresp32 .
+arduino-cli compile --fqbn $BOARD_FQBN .
+arduino-cli upload -p PORT --fqbn $BOARD_FQBN .
 
 # Test Audio
 cd ../Audio
-arduino-cli compile --fqbn esp32:esp32:featheresp32 .
-arduino-cli upload -p PORT --fqbn esp32:esp32:featheresp32 .
+arduino-cli compile --fqbn $BOARD_FQBN .
+arduino-cli upload -p PORT --fqbn $BOARD_FQBN .
 ```
 
 ### Fall Detection Testing
@@ -627,10 +695,18 @@ Edit `SmartFall/utils/config.h`:
 
 Upload the audio test module:
 
+**For ESP32 HUZZAH32 Feather (Original):**
 ```bash
 cd SmartFall/tests/Audio
 arduino-cli compile --fqbn esp32:esp32:featheresp32 .
 arduino-cli upload -p PORT --fqbn esp32:esp32:featheresp32 .
+```
+
+**For ESP32 Feather V2:**
+```bash
+cd SmartFall/tests/Audio
+arduino-cli compile --fqbn esp32:esp32:adafruit_feather_esp32_v2 .
+arduino-cli upload -p PORT --fqbn esp32:esp32:adafruit_feather_esp32_v2 .
 ```
 
 The test will automatically play through all audio features:
