@@ -1,9 +1,11 @@
 /*
  * FSR (Force Sensitive Resistor) Sensor Test
+ * ESP32 Feather V2
  *
  * Wiring:
  * FSR one end -> 3.3V
- * FSR other end -> GPIO A2 and 10kΩ resistor to GND
+ * FSR other end -> A2 (GPIO 34) and 22kΩ pull-up resistor to 3.3V
+ * FSR signal -> 0.1µF capacitor to GND for filtering
  */
 
 #include "FSR_Sensor.h"

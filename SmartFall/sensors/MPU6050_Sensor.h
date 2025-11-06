@@ -5,6 +5,7 @@
 #include <Wire.h>
 #include <Adafruit_MPU6050.h>
 #include <Adafruit_Sensor.h>
+#include "../utils/config.h"
 
 class MPU6050_Sensor {
 private:
@@ -14,7 +15,7 @@ private:
     uint8_t scl_pin;
 
 public:
-    MPU6050_Sensor(uint8_t sda = 23, uint8_t scl = 22);
+    MPU6050_Sensor(uint8_t sda = MPU6050_SDA_PIN, uint8_t scl = MPU6050_SCL_PIN);
 
     bool begin();
     void configure(mpu6050_accel_range_t accel_range = MPU6050_RANGE_8_G,

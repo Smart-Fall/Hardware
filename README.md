@@ -320,20 +320,20 @@ All I2C devices connect to the same SDA/SCL pins:
 
 | Sensor   | VCC  | GND | SDA     | SCL     |
 |----------|------|-----|---------|---------|
-| MPU6050  | 3.3V | GND | GPIO 23 | GPIO 22 |
-| BMP280   | 3.3V | GND | GPIO 23 | GPIO 22 |
-| MAX30102 | 3.3V | GND | GPIO 23 | GPIO 22 |
+| MPU6050  | 3.3V | GND | GPIO 22 | GPIO 20 |
+| BMP280   | 3.3V | GND | GPIO 22 | GPIO 20 |
+| MAX30102 | 3.3V | GND | GPIO 22 | GPIO 20 |
 
 ### Analog & Digital Pins
 
 | Component          | ESP32 Pin | Type    | Description |
 |-------------------|-----------|---------|-------------|
-| FSR Sensor        | A2        | Analog  | Force sensor |
+| FSR Sensor        | A2        | Analog  | Force sensor (GPIO 34, ADC1) |
 | SOS Button        | GPIO 15   | Digital | Emergency button (INPUT_PULLUP) |
 | Speaker (PAM8302) | GPIO 25   | PWM     | Audio output |
 | Haptic Motor      | GPIO 26   | Digital | Vibration feedback |
 | Visual Alert LED  | GPIO 27   | Digital | LED indicator |
-| Battery Monitor   | A13       | Analog  | Battery voltage |
+| Battery Monitor   | A4        | Analog  | Battery voltage (GPIO 36, ADC1) |
 
 ### PAM8302 Audio Amplifier Wiring
 

@@ -4,7 +4,7 @@
  * Tests PAM8302 2.5W Class D Audio Amplifier with various tones,
  * alert patterns, and voice-like sequences
  *
- * Hardware: ESP32 HUZZAH32 Feather + PAM8302 Amplifier
+ * Hardware: ESP32 Feather V2 + PAM8302 Amplifier
  *
  * Wiring:
  * - PAM8302 A+ → ESP32 GPIO 25 (PWM output)

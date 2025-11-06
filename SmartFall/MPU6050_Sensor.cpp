@@ -1,4 +1,4 @@
-#include "sensors/MPU6050_Sensor.h"
+#include "MPU6050_Sensor.h"
 
 MPU6050_Sensor::MPU6050_Sensor(uint8_t sda, uint8_t scl)
     : initialized(false), sda_pin(sda), scl_pin(scl) {
@@ -74,3 +74,4 @@ void MPU6050_Sensor::printInfo() {
         case MPU6050_RANGE_2000_DEG: Serial.println("2000°/s"); break;
     }
 }
+

@@ -3,19 +3,19 @@
  *
  * Test program using modular MPU6050_Sensor and BMP280_Sensor classes
  *
- * Hardware: ESP32 HUZZAH32 Feather
+ * Hardware: ESP32 Feather V2
  * Sensors: MPU6050 (Accelerometer + Gyroscope) + BMP280 (Pressure + Temperature)
  *
  * Wiring (I2C shared bus):
  * MPU6050 VCC -> 3.3V
  * MPU6050 GND -> GND
- * MPU6050 SDA -> GPIO 23
- * MPU6050 SCL -> GPIO 22
+ * MPU6050 SDA -> GPIO 22
+ * MPU6050 SCL -> GPIO 20
  *
  * BMP280 VCC -> 3.3V
  * BMP280 GND -> GND
- * BMP280 SDA -> GPIO 23 (shared)
- * BMP280 SCL -> GPIO 22 (shared)
+ * BMP280 SDA -> GPIO 22 (shared)
+ * BMP280 SCL -> GPIO 20 (shared)
  */
 
 #include "MPU6050_Sensor.h"

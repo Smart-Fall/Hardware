@@ -15,7 +15,7 @@ private:
     float seaLevelPressure;
 
 public:
-    BMP280_Sensor(uint8_t sda = 23, uint8_t scl = 22);
+    BMP280_Sensor(uint8_t sda = 22, uint8_t scl = 20);
 
     bool begin(uint8_t address = 0x76);
     void configure();

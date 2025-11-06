@@ -4,6 +4,7 @@
 #include <Arduino.h>
 #include <Wire.h>
 #include <Adafruit_BMP280.h>
+#include "../utils/config.h"
 
 class BMP280_Sensor {
 private:
@@ -15,7 +16,7 @@ private:
     float seaLevelPressure;
 
 public:
-    BMP280_Sensor(uint8_t sda = 23, uint8_t scl = 22);
+    BMP280_Sensor(uint8_t sda = BMP280_SDA_PIN, uint8_t scl = BMP280_SCL_PIN);
 
     bool begin(uint8_t address = 0x76);
     void configure();

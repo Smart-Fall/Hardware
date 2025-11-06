@@ -1,4 +1,4 @@
-#include "sensors/FSR_Sensor.h"
+#include "FSR_Sensor.h"
 
 FSR_Sensor::FSR_Sensor(uint8_t pin)
     : analog_pin(pin), initialized(false), baseline_value(0) {
@@ -69,3 +69,4 @@ void FSR_Sensor::printInfo() {
     Serial.print("Baseline value: ");
     Serial.println(baseline_value);
 }
+

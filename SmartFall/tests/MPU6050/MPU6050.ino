@@ -1,11 +1,12 @@
 /*
  * MPU6050 Sensor Test
+ * ESP32 Feather V2
  *
  * Wiring:
  * MPU6050 VCC -> 3.3V
  * MPU6050 GND -> GND
- * MPU6050 SDA -> GPIO 23
- * MPU6050 SCL -> GPIO 22
+ * MPU6050 SDA -> GPIO 22
+ * MPU6050 SCL -> GPIO 20
  */
 
 #include "MPU6050_Sensor.h"

@@ -1,4 +1,4 @@
-#include "detection/confidence_scorer.h"
+#include "confidence_scorer.h"
 
 ConfidenceScorer::ConfidenceScorer() : stage1_score(0), stage2_score(0), stage3_score(0),
                                        stage4_score(0), filter_score(0),

@@ -1,4 +1,4 @@
-#include "detection/fall_detector.h"
+#include "fall_detector.h"
 
 FallDetector::FallDetector() : current_status(FALL_STATUS_MONITORING),
                                monitoring_active(false),

@@ -1,4 +1,4 @@
-#include "sensors/BMP280_Sensor.h"
+#include "BMP280_Sensor.h"
 
 BMP280_Sensor::BMP280_Sensor(uint8_t sda, uint8_t scl)
     : initialized(false), sda_pin(sda), scl_pin(scl),
@@ -78,3 +78,4 @@ void BMP280_Sensor::printInfo() {
     Serial.println("Temperature oversampling: X2");
     Serial.println("Filter: X16");
 }
+

@@ -1,11 +1,12 @@
 /*
  * BMP280 Sensor Test
+ * ESP32 Feather V2
  *
  * Wiring:
  * BMP280 VCC -> 3.3V
  * BMP280 GND -> GND
- * BMP280 SDA -> GPIO 23
- * BMP280 SCL -> GPIO 22
+ * BMP280 SDA -> GPIO 22
+ * BMP280 SCL -> GPIO 20
  */
 
 #include "BMP280_Sensor.h"

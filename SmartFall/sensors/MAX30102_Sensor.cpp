@@ -1,7 +1,7 @@
 #include "MAX30102_Sensor.h"
 
-MAX30102_Sensor::MAX30102_Sensor(uint8_t sda, uint8_t scl)
-    : initialized(false), sda_pin(sda), scl_pin(scl),
+MAX30102_Sensor::MAX30102_Sensor(uint8_t sda, uint8_t scl, uint8_t rst)
+    : initialized(false), sda_pin(sda), scl_pin(scl), rst_pin(rst),
       rateSpot(0), lastBeat(0), beatsPerMinute(0), beatAvg(0) {
     for (byte i = 0; i < RATE_SIZE; i++) {
         rates[i] = 0;
@@ -9,12 +9,51 @@ MAX30102_Sensor::MAX30102_Sensor(uint8_t sda, uint8_t scl)
 }
 
 bool MAX30102_Sensor::begin() {
-    Wire.begin(sda_pin, scl_pin);
+    // Configure and perform hardware reset
+    pinMode(rst_pin, OUTPUT);
+    digitalWrite(rst_pin, HIGH);  // RST is active LOW, so HIGH = normal operation
+    delay(100);
 
+    Serial.print("MAX30102: Performing AGGRESSIVE hardware reset on GPIO ");
+    Serial.println(rst_pin);
+
+    // First reset attempt
+    digitalWrite(rst_pin, LOW);
+    delay(100);  // Longer hold time (100ms instead of 10ms)
+    digitalWrite(rst_pin, HIGH);
+    delay(500);  // Longer wait time (500ms)
+
+    // Second reset attempt (sometimes needed for stubborn modules)
+    Serial.println("MAX30102: Second reset attempt...");
+    digitalWrite(rst_pin, LOW);
+    delay(100);
+    digitalWrite(rst_pin, HIGH);
+    delay(500);
+
+    Wire.begin(sda_pin, scl_pin);
+    delay(100);
+
+    // Try FAST speed first (per Instructables guide for DFRobot modules)
+    Serial.println("Attempting library initialization...");
+    Serial.println("  Trying I2C_SPEED_FAST (per Instructables guide)...");
     if (!particleSensor.begin(Wire, I2C_SPEED_FAST)) {
-        Serial.println("Failed to initialize MAX30102");
-        return false;
+        Serial.println("  I2C_SPEED_FAST failed");
+        Serial.println("  Trying DEFAULT speed...");
+        if (!particleSensor.begin(Wire)) {
+            Serial.println("  DEFAULT speed failed");
+            Serial.println("  Trying I2C_SPEED_STANDARD...");
+            if (!particleSensor.begin(Wire, I2C_SPEED_STANDARD)) {
+                Serial.println("Failed to initialize MAX30102 at any speed");
+                return false;
+            }
+        }
     }
+
+    Serial.println("✓ particleSensor.begin() successful!");
+
+    // Additional setup per Instructables guide
+    Serial.println("Performing additional sensor setup...");
+    particleSensor.setup();  // Configure default settings
 
     initialized = true;
     return true;
@@ -27,8 +66,12 @@ void MAX30102_Sensor::configure(byte ledBrightness, byte sampleAverage,
 
     particleSensor.setup(ledBrightness, sampleAverage, ledMode,
                          sampleRate, pulseWidth, adcRange);
-    particleSensor.setPulseAmplitudeRed(0x0A);
-    particleSensor.setPulseAmplitudeGreen(0);
+
+    // Set LED brightness to visible levels
+    // Range: 0x00 (off) to 0xFF (max brightness)
+    particleSensor.setPulseAmplitudeRed(0xFF);      // Red LED - max brightness
+    particleSensor.setPulseAmplitudeIR(0xFF);       // IR LED - max brightness
+    particleSensor.setPulseAmplitudeGreen(0);       // Green LED - disabled
 }
 
 bool MAX30102_Sensor::readHeartRate(float &bpm, bool &finger_detected) {

@@ -5,6 +5,7 @@
 #include <Wire.h>
 #include <MAX30105.h>
 #include <heartRate.h>
+#include "../utils/config.h"
 
 class MAX30102_Sensor {
 private:
@@ -12,6 +13,7 @@ private:
     bool initialized;
     uint8_t sda_pin;
     uint8_t scl_pin;
+    uint8_t rst_pin;
 
     const byte RATE_SIZE = 4;
     byte rates[4];
@@ -21,7 +23,7 @@ private:
     int beatAvg;
 
 public:
-    MAX30102_Sensor(uint8_t sda = 23, uint8_t scl = 22);
+    MAX30102_Sensor(uint8_t sda = MAX30102_SDA_PIN, uint8_t scl = MAX30102_SCL_PIN, uint8_t rst = MAX30102_RST_PIN);
 
     bool begin();
     void configure(byte ledBrightness = 60,

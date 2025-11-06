@@ -4,7 +4,7 @@
  * Tests BLE GATT server functionality, characteristic notifications,
  * and mobile app connectivity
  *
- * Hardware: ESP32 HUZZAH32 Feather
+ * Hardware: ESP32 Feather V2
  *
  * This test verifies:
  * - BLE server initialization

@@ -3,7 +3,7 @@
  *
  * Tests WiFi connectivity, HTTP communication, and auto-reconnect features
  *
- * Hardware: ESP32 HUZZAH32 Feather
+ * Hardware: ESP32 Feather V2
  *
  * This test verifies:
  * - WiFi connection to configured network

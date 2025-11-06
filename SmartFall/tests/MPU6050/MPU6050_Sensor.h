@@ -14,7 +14,7 @@ private:
     uint8_t scl_pin;
 
 public:
-    MPU6050_Sensor(uint8_t sda = 23, uint8_t scl = 22);
+    MPU6050_Sensor(uint8_t sda = 22, uint8_t scl = 20); 
 
     bool begin();
     void configure(mpu6050_accel_range_t accel_range = MPU6050_RANGE_8_G,
