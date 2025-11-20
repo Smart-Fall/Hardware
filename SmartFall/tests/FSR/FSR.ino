@@ -12,29 +12,36 @@
 
 FSR_Sensor fsr(A2);
 
-void setup() {
+void setup()
+{
     Serial.begin(115200);
     delay(2000);
+    pinMode(13, OUTPUT); // Onboard LED for indication
 
     Serial.println("\n=== FSR Sensor Test ===\n");
 
-    if (!fsr.begin()) {
+    if (!fsr.begin())
+    {
         Serial.println("ERROR: FSR initialization failed!");
-        while (1) delay(1000);
+        while (1)
+            delay(1000);
     }
 
     Serial.println("✓ FSR initialized");
 
     fsr.printInfo();
-    fsr.calibrate();
+
+    // Calibrate with 50 samples for faster startup (default was 100)
+    fsr.calibrate(50);
 
     Serial.println("\nPress the FSR sensor...\n");
 }
 
-void loop() {
+void loop()
+{
     uint16_t raw = fsr.readRaw();
     float force = fsr.readForce();
-    bool impact = fsr.detectImpact(500);
+    bool impact = fsr.detectImpact(300); // Threshold adjusted for delta from baseline
 
     Serial.println("--- FSR Data ---");
     Serial.print("Raw Value: ");
@@ -44,11 +51,15 @@ void loop() {
     Serial.print(force, 2);
     Serial.println(" N");
 
-    if (impact) {
+    if (impact)
+    {
+        digitalWrite(13, HIGH); // Turn on LED
         Serial.println("⚠ IMPACT DETECTED!");
+    }else{
+        digitalWrite(13, LOW); // Turn off LED
     }
 
     Serial.println();
 
-    delay(200);
+    delay(50); // Reduced from 200ms for faster response (20Hz update rate)
 }

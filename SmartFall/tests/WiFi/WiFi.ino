@@ -17,17 +17,18 @@
 #include "WiFi_Manager.h"
 
 // WiFi Configuration - CHANGE THESE!
-#define WIFI_SSID        "Your_WiFi_SSID"
-#define WIFI_PASSWORD    "Your_WiFi_Password"
-#define SERVER_URL       "http://httpbin.org/post"  // Test server
+#define WIFI_SSID "thaowifi"
+#define WIFI_PASSWORD "123456777"
+#define SERVER_URL "http://httpbin.org/post" // Test server
 
 WiFi_Manager wifiManager;
 
 unsigned long lastTest = 0;
-unsigned long testInterval = 10000;  // Test every 10 seconds
+unsigned long testInterval = 10000; // Test every 10 seconds
 int testCounter = 0;
 
-void setup() {
+void setup()
+{
     Serial.begin(115200);
     delay(2000);
 
@@ -35,10 +36,42 @@ void setup() {
     Serial.println("      SmartFall WiFi Module Test");
     Serial.println("========================================\n");
 
-    // Test 1: WiFi Connection
-    Serial.println("TEST 1: WiFi Connection");
+    // Test 1: Scan Available WiFi Networks
+    Serial.println("TEST 1: Scanning Available WiFi Networks");
+    Serial.println("-----------------------------------------");
+    Serial.println("Scanning for networks...\n");
+
+    int numNetworks = WiFi.scanNetworks();
+
+    if (numNetworks == 0)
+    {
+        Serial.println("No networks found");
+    }
+    else
+    {
+        Serial.print("Found ");
+        Serial.print(numNetworks);
+        Serial.println(" network(s):\n");
+
+        for (int i = 0; i < numNetworks; i++)
+        {
+            Serial.print(i + 1);
+            Serial.print(". ");
+            Serial.print(WiFi.SSID(i));
+            Serial.print(" (");
+            Serial.print(WiFi.RSSI(i));
+            Serial.print(" dBm) ");
+            Serial.print(WiFi.encryptionType(i) == WIFI_AUTH_OPEN ? "Open" : "Encrypted");
+            Serial.println();
+        }
+    }
+    Serial.println();
+
+    // Test 2: WiFi Connection
+    Serial.println("TEST 2: WiFi Connection");
     Serial.println("------------------------");
-    if (wifiManager.begin(WIFI_SSID, WIFI_PASSWORD)) {
+    if (wifiManager.begin(WIFI_SSID, WIFI_PASSWORD))
+    {
         Serial.println("✓ WiFi connection successful\n");
 
         // Set server URL
@@ -49,14 +82,17 @@ void setup() {
 
         // Print detailed connection info
         wifiManager.printConnectionInfo();
-    } else {
+    }
+    else
+    {
         Serial.println("✗ WiFi connection failed!");
         Serial.println("\nPlease check:");
         Serial.println("1. WiFi SSID and password are correct");
         Serial.println("2. WiFi network is available");
         Serial.println("3. ESP32 antenna is properly connected");
         Serial.println("\nTest cannot continue without WiFi.\n");
-        while (true) {
+        while (true)
+        {
             delay(1000);
         }
     }
@@ -69,36 +105,49 @@ void setup() {
     Serial.print(rssi);
     Serial.println(" dBm");
 
-    if (rssi > -50) {
+    if (rssi > -50)
+    {
         Serial.println("✓ Excellent signal strength");
-    } else if (rssi > -60) {
+    }
+    else if (rssi > -60)
+    {
         Serial.println("✓ Good signal strength");
-    } else if (rssi > -70) {
+    }
+    else if (rssi > -70)
+    {
         Serial.println("⚠ Fair signal strength");
-    } else {
+    }
+    else
+    {
         Serial.println("⚠ Weak signal strength - may affect reliability");
     }
     Serial.println();
 
-    // Test 3: HTTP POST (Plain Text)
-    Serial.println("TEST 3: HTTP POST (Plain Text)");
+    // Test 4: HTTP POST (Plain Text)
+    Serial.println("TEST 4: HTTP POST (Plain Text)");
     Serial.println("--------------------------------");
     String testMessage = "SmartFall WiFi Test - Plain Text Message";
-    if (wifiManager.sendTestMessage(testMessage)) {
+    if (wifiManager.sendTestMessage(testMessage))
+    {
         Serial.println("✓ Plain text HTTP POST successful\n");
-    } else {
+    }
+    else
+    {
         Serial.println("✗ Plain text HTTP POST failed\n");
     }
 
     delay(2000);
 
-    // Test 4: HTTP POST (JSON)
-    Serial.println("TEST 4: HTTP POST (JSON)");
+    // Test 5: HTTP POST (JSON)
+    Serial.println("TEST 5: HTTP POST (JSON)");
     Serial.println("-------------------------");
     String jsonPayload = "{\"device\":\"SmartFall\",\"test\":\"WiFi Module\",\"timestamp\":" + String(millis()) + "}";
-    if (wifiManager.sendJSON(jsonPayload)) {
+    if (wifiManager.sendJSON(jsonPayload))
+    {
         Serial.println("✓ JSON HTTP POST successful\n");
-    } else {
+    }
+    else
+    {
         Serial.println("✗ JSON HTTP POST failed\n");
     }
 
@@ -108,21 +157,24 @@ void setup() {
     Serial.println("Now monitoring connection and sending periodic test messages...\n");
 }
 
-void loop() {
+void loop()
+{
     unsigned long currentTime = millis();
 
     // Check WiFi connection (auto-reconnect if enabled)
     wifiManager.checkConnection();
 
     // Send periodic test messages
-    if (currentTime - lastTest >= testInterval) {
+    if (currentTime - lastTest >= testInterval)
+    {
         lastTest = currentTime;
         testCounter++;
 
         Serial.println("--- Periodic Test #" + String(testCounter) + " ---");
 
         // Check if still connected
-        if (wifiManager.isConnected()) {
+        if (wifiManager.isConnected())
+        {
             Serial.println("✓ WiFi connected");
             Serial.print("IP: ");
             Serial.println(wifiManager.getLocalIP());
@@ -135,12 +187,17 @@ void loop() {
                               ",\"uptime_ms\":" + String(millis()) +
                               ",\"rssi\":" + String(wifiManager.getRSSI()) + "}";
 
-            if (wifiManager.sendJSON(jsonTest)) {
+            if (wifiManager.sendJSON(jsonTest))
+            {
                 Serial.println("✓ Test message sent successfully");
-            } else {
+            }
+            else
+            {
                 Serial.println("✗ Failed to send test message");
             }
-        } else {
+        }
+        else
+        {
             Serial.println("✗ WiFi disconnected - waiting for reconnect...");
         }
 
