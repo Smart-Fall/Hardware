@@ -13,6 +13,15 @@ private:
     uint8_t sda_pin;
     uint8_t scl_pin;
 
+    // Calibration offsets
+    float gyro_offset_x;
+    float gyro_offset_y;
+    float gyro_offset_z;
+    float accel_offset_x;
+    float accel_offset_y;
+    float accel_offset_z;
+    bool calibrated;
+
 public:
     MPU6050_Sensor(uint8_t sda = 22, uint8_t scl = 20); 
 
@@ -25,6 +34,8 @@ public:
                   float &gyro_x, float &gyro_y, float &gyro_z,
                   float &temp);
 
+    void calibrate(uint16_t samples = 100);
+    bool isCalibrated();
     bool isInitialized();
     void printInfo();
 };

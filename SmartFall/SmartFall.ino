@@ -1,46 +1,47 @@
 /*
  * SmartFall - Complete Wearable Fall Detection System
- * with WiFi/BLE Communication + Audio Alerts
+ * with WiFi Communication + Audio Alerts
  *
  * Hardware: ESP32 Feather V2
- * Sensors: MPU6050 (IMU), BMP280 (Pressure), MAX30102 (Heart Rate), FSR (Force)
- * Communication: WiFi + Bluetooth Low Energy (BLE)
+ * Sensors: MPU6050Sensor (IMU), BMP280Sensor (Pressure), FSR (Force)
+ * Communication: WiFi
  * Audio: PAM8302 2.5W Class D Amplifier
  *
  * This is the complete implementation with all features integrated.
  */
 
 #include <esp_mac.h> // For MAC address functions in ESP32 core 3.x
-#include "sensors/MPU6050_Sensor.h"
-#include "sensors/BMP280_Sensor.h"
-#include "sensors/MAX30102_Sensor.h"
-#include "sensors/FSR_Sensor.h"
-#include "detection/fall_detector.h"
-#include "detection/confidence_scorer.h"
-#include "communication/WiFi_Manager.h"
-#include "communication/BLE_Server.h"
-#include "communication/Emergency_Comms.h"
-#include "audio/Audio_Manager.h"
-#include "utils/config.h"
-#include "utils/data_types.h"
+#include "MPU6050.h"
+#include "BMP280.h"
+#include "FSR.h"
+#include "MAX30102_Sensor.h"
+#include "Fall_Detector.h"
+#include "Confidence_Scorer.h"
+#include "WiFi_Manager.h"
+#include "Emergency_Comms.h"
+#include "Audio_Manager.h"
+#include "Config.h"
+#include "Data_Types.h"
 
 // Sensor instances
-MPU6050_Sensor imuSensor;
-BMP280_Sensor pressureSensor;
-MAX30102_Sensor heartRateSensor;
-FSR_Sensor forceSensor(FSR_ANALOG_PIN);
+MPU6050Sensor imuSensor;
+BMP280Sensor pressureSensor;
+MAX30102Sensor heartRateSensor;
+FSRSensor fsr1(FSR1_PIN);
+FSRSensor fsr2(FSR2_PIN);
+FSRSensor fsr3(FSR3_PIN);
+FSRSensor fsr4(FSR4_PIN);
 
 // Detection system
 FallDetector fallDetector;
 ConfidenceScorer confidenceScorer;
 
 // Communication system
-WiFi_Manager wifiManager;
-BLE_Server bleServer;
-Emergency_Comms emergencyComms(&wifiManager, &bleServer);
+WiFiManager wifiManager;
+EmergencyComms emergencyComms(&wifiManager, nullptr);
 
 // Audio system
-Audio_Manager audioManager(SPEAKER_PIN);
+AudioManager audioManager(SPEAKER_PIN);
 
 // System state
 SensorData_t currentSensorData;
@@ -70,11 +71,9 @@ void setup()
   // Initialize SOS button
   pinMode(SOS_BUTTON_PIN, INPUT_PULLUP);
 
-  // Initialize haptic and visual alert outputs
-  pinMode(HAPTIC_PIN, OUTPUT);
+  // Initialize visual alert output
   pinMode(VISUAL_ALERT_PIN, OUTPUT);
 
-  digitalWrite(HAPTIC_PIN, LOW);
   digitalWrite(VISUAL_ALERT_PIN, LOW);
 
   // Initialize audio system
@@ -106,6 +105,8 @@ void setup()
   {
     Serial.println("✓ Fall detector initialized");
     fallDetector.enableMonitoring();
+    Serial.println("✓ Fall monitoring ENABLED");
+    Serial.println("\n*** SHAKE/DROP THE DEVICE TO TEST FALL DETECTION ***\n");
   }
   else
   {
@@ -119,7 +120,11 @@ void setup()
   Serial.println("\n========================================");
   Serial.println("       SmartFall Ready!");
   Serial.println("========================================");
-  Serial.println("Monitoring for falls...\n");
+  Serial.println("Monitoring for falls...");
+  Serial.println("\nTest Commands:");
+  Serial.println("  T - Trigger manual fall test");
+  Serial.println("  S - Show current sensor readings");
+  Serial.println("========================================\n");
 
   // Play system ready voice alert
   if (AUDIO_ENABLE_VOICE_ALERTS)
@@ -134,6 +139,22 @@ void setup()
 void loop()
 {
   uint32_t currentTime = millis();
+
+  // Check for serial commands (for testing)
+  if (Serial.available() > 0)
+  {
+    char cmd = Serial.read();
+    if (cmd == 't' || cmd == 'T')
+    {
+      Serial.println("\n*** MANUAL FALL TEST TRIGGERED ***");
+      handleFallDetected();
+    }
+    else if (cmd == 's' || cmd == 'S')
+    {
+      Serial.println("\n--- Current Sensor Readings ---");
+      printSensorData();
+    }
+  }
 
   // Check WiFi connection (auto-reconnect if enabled)
   wifiManager.checkConnection();
@@ -155,21 +176,54 @@ void loop()
     // Read all sensors
     readSensors();
 
+    // Log sensor status periodically (every 5 seconds)
+    static uint32_t lastSensorLog = 0;
+    if (DEBUG_ALGORITHM_STEPS && (currentTime - lastSensorLog) >= 5000)
+    {
+      lastSensorLog = currentTime;
+      Serial.println("\n=== Sensor Status ===");
+      Serial.print("IMU: ");
+      Serial.println(imuSensor.isInitialized() ? "OK" : "ERROR");
+      Serial.print("BMP280: ");
+      Serial.println(pressureSensor.isInitialized() ? "OK" : "ERROR");
+      Serial.print("MAX30102 (Heart Rate): ");
+      Serial.println(heartRateSensor.isInitialized() ? "OK" : "ERROR");
+      Serial.print("FSR1: ");
+      Serial.print(fsr1.isInitialized() ? "OK" : "ERROR");
+      Serial.print(", FSR2: ");
+      Serial.print(fsr2.isInitialized() ? "OK" : "ERROR");
+      Serial.print(", FSR3: ");
+      Serial.print(fsr3.isInitialized() ? "OK" : "ERROR");
+      Serial.print(", FSR4: ");
+      Serial.println(fsr4.isInitialized() ? "OK" : "ERROR");
+      Serial.print("Fall Detector: ");
+      Serial.println(fallDetector.isMonitoring() ? "MONITORING" : "INACTIVE");
+      Serial.println("===================\n");
+    }
+
     // Process sensor data through fall detector
     fallDetector.processSensorData(currentSensorData);
 
     // Check fall status
     FallStatus_t status = fallDetector.getCurrentStatus();
 
+    // Log current acceleration magnitude every 2 seconds
+    static uint32_t lastAccelLog = 0;
+    if (DEBUG_ALGORITHM_STEPS && (currentTime - lastAccelLog) >= 2000)
+    {
+      lastAccelLog = currentTime;
+      float total_accel = sqrt(currentSensorData.accel_x * currentSensorData.accel_x +
+                               currentSensorData.accel_y * currentSensorData.accel_y +
+                               currentSensorData.accel_z * currentSensorData.accel_z);
+      Serial.print("[AccelMag] ");
+      Serial.print(total_accel, 3);
+      Serial.print("g, Status: ");
+      Serial.println(status);
+    }
+
     if (status == FALL_STATUS_FALL_DETECTED && !alertActive)
     {
       handleFallDetected();
-    }
-
-    // Stream sensor data via BLE if enabled
-    if (bleServer.shouldStream())
-    {
-      bleServer.sendSensorData(currentSensorData);
     }
 
     // Debug output
@@ -218,7 +272,7 @@ void initializeSensors()
   }
   else
   {
-    Serial.println("✓ MPU6050 initialized");
+    Serial.println("✓ MPU6050Sensor initialized");
     imuSensor.configure();
   }
 
@@ -230,34 +284,61 @@ void initializeSensors()
   }
   else
   {
-    Serial.println("✓ BMP280 initialized");
+    Serial.println("✓ BMP280Sensor initialized");
     pressureSensor.configure();
     delay(1000);
     pressureSensor.resetBaselineAltitude();
   }
 
-  if (!heartRateSensor.begin())
+  // Initialize MAX30102 heart rate sensor
+  if (!heartRateSensor.begin(0x57))
   {
-    Serial.println("ERROR: Failed to initialize MAX30102!");
+    Serial.println("ERROR: Failed to initialize MAX30102 heart rate sensor!");
     systemStatus.sensors_initialized = false;
     audioManager.playErrorTone();
   }
   else
   {
-    Serial.println("✓ MAX30102 initialized");
+    Serial.println("✓ MAX30102 heart rate sensor initialized");
     heartRateSensor.configure();
   }
 
-  if (!forceSensor.begin())
+  // Initialize all 4 FSR sensors
+  bool fsr_ok = true;
+  if (!fsr1.begin())
   {
-    Serial.println("ERROR: Failed to initialize FSR!");
+    Serial.println("ERROR: Failed to initialize FSR1!");
+    fsr_ok = false;
+  }
+  if (!fsr2.begin())
+  {
+    Serial.println("ERROR: Failed to initialize FSR2!");
+    fsr_ok = false;
+  }
+  if (!fsr3.begin())
+  {
+    Serial.println("ERROR: Failed to initialize FSR3!");
+    fsr_ok = false;
+  }
+  if (!fsr4.begin())
+  {
+    Serial.println("ERROR: Failed to initialize FSR4!");
+    fsr_ok = false;
+  }
+
+  if (!fsr_ok)
+  {
+    Serial.println("ERROR: One or more FSR sensors failed to initialize!");
     systemStatus.sensors_initialized = false;
     audioManager.playErrorTone();
   }
   else
   {
-    Serial.println("✓ FSR initialized");
-    forceSensor.calibrate();
+    Serial.println("✓ All 4 FSR sensors initialized");
+    fsr1.calibrate();
+    fsr2.calibrate();
+    fsr3.calibrate();
+    fsr4.calibrate();
   }
 
   if (systemStatus.sensors_initialized)
@@ -276,39 +357,25 @@ void initializeCommunication()
     wifiManager.enableAutoReconnect(true);
     Serial.println("✓ WiFi connected");
     audioManager.playConfirmationTone();
+
+    // Test server connection
+    delay(1000); // Give WiFi a moment to stabilize
+    Serial.println("\n[WiFi] Testing server connection...");
+    if (wifiManager.testServerConnection())
+    {
+      Serial.println("✓ Server connection verified - Ready to send data!");
+      audioManager.playConfirmationTone();
+    }
+    else
+    {
+      Serial.println("✗ Server connection failed - Check web app is running!");
+      Serial.println("    Device will retry automatically when sending data.");
+      audioManager.playErrorTone();
+    }
   }
   else
   {
     Serial.println("✗ WiFi connection failed (will retry automatically)");
-    audioManager.playErrorTone();
-  }
-
-  // Initialize BLE
-  Serial.println("\n[BLE] Starting...");
-  if (bleServer.begin(BLE_DEVICE_NAME))
-  {
-    bleServer.setStreamingInterval(BLE_STREAMING_INTERVAL_MS);
-    Serial.println("✓ BLE server started");
-    audioManager.playConfirmationTone();
-
-    // Register BLE callbacks
-    bleServer.onConnect([]()
-                        {
-      Serial.println("[BLE] Mobile app connected!");
-      audioManager.playConfirmationTone(); });
-
-    bleServer.onDisconnect([]()
-                           {
-      Serial.println("[BLE] Mobile app disconnected");
-      if (AUDIO_ENABLE_VOICE_ALERTS) {
-        audioManager.playVoiceAlert(VOICE_ALERT_CONNECTION_LOST);
-      } });
-
-    bleServer.onCommand(handleBLECommand);
-  }
-  else
-  {
-    Serial.println("✗ BLE initialization failed");
     audioManager.playErrorTone();
   }
 
@@ -338,6 +405,25 @@ void readSensors()
                        currentSensorData.gyro_y,
                        currentSensorData.gyro_z,
                        temp);
+
+    // Check for sensor failure (all zeros indicates I2C error)
+    float total_accel = sqrt(currentSensorData.accel_x * currentSensorData.accel_x +
+                             currentSensorData.accel_y * currentSensorData.accel_y +
+                             currentSensorData.accel_z * currentSensorData.accel_z);
+
+    if (total_accel < 0.1f) // Should never be this low in normal operation
+    {
+      Serial.println("WARNING: MPU6050Sensor sensor failure detected! Attempting reinitialization...");
+      if (imuSensor.begin())
+      {
+        Serial.println("✓ MPU6050Sensor reinitialized successfully");
+        imuSensor.calibrate();
+      }
+      else
+      {
+        Serial.println("ERROR: MPU6050Sensor reinitialization failed!");
+      }
+    }
   }
   else
   {
@@ -360,32 +446,67 @@ void readSensors()
     currentSensorData.pressure = 1013.25; // Sea level pressure
   }
 
-  // Read heart rate (MAX30102)
+  // Read heart rate sensor (MAX30102)
   if (heartRateSensor.isInitialized())
   {
-    float bpm;
-    bool fingerDetected;
-    if (heartRateSensor.readHeartRate(bpm, fingerDetected))
+    float temp;
+    if (heartRateSensor.readData(currentSensorData.heart_rate, currentSensorData.spo2, temp))
     {
-      currentSensorData.heart_rate = bpm;
-    }
-    else
-    {
-      currentSensorData.heart_rate = 0;
+      currentSensorData.heart_rate_temperature = temp;
+
+      if (DEBUG_SENSOR_DATA)
+      {
+        Serial.print("[MAX30102] HR: ");
+        Serial.print(currentSensorData.heart_rate);
+        Serial.print(" BPM, SpO2: ");
+        Serial.print(currentSensorData.spo2);
+        Serial.print("%, Temp: ");
+        Serial.println(temp);
+      }
     }
   }
   else
   {
     currentSensorData.heart_rate = 0;
+    currentSensorData.spo2 = 0;
+    currentSensorData.heart_rate_temperature = 0.0f;
   }
 
-  // Read force sensor (FSR)
-  if (forceSensor.isInitialized())
+  // Read all 4 force sensors (FSR)
+  if (fsr1.isInitialized() && fsr2.isInitialized() &&
+      fsr3.isInitialized() && fsr4.isInitialized())
   {
-    currentSensorData.fsr_value = forceSensor.readRaw();
+    currentSensorData.fsr_values[0] = fsr1.readRaw();
+    currentSensorData.fsr_values[1] = fsr2.readRaw();
+    currentSensorData.fsr_values[2] = fsr3.readRaw();
+    currentSensorData.fsr_values[3] = fsr4.readRaw();
+
+    // Calculate combined FSR metric:
+    // - Use maximum value (detects impact on any sensor)
+    // - Also store average for general pressure detection
+    uint16_t max_fsr = max(max(currentSensorData.fsr_values[0], currentSensorData.fsr_values[1]),
+                           max(currentSensorData.fsr_values[2], currentSensorData.fsr_values[3]));
+    uint32_t sum_fsr = currentSensorData.fsr_values[0] + currentSensorData.fsr_values[1] +
+                       currentSensorData.fsr_values[2] + currentSensorData.fsr_values[3];
+    uint16_t avg_fsr = sum_fsr / 4;
+
+    // Use max for impact detection (fall creates sudden pressure spike)
+    currentSensorData.fsr_value = max_fsr;
+
+    // Count how many sensors detect significant pressure (helps detect falls vs normal pressure)
+    uint16_t active_sensors = 0;
+    for (int i = 0; i < 4; i++)
+    {
+      if (currentSensorData.fsr_values[i] > 100)
+        active_sensors++;
+    }
   }
   else
   {
+    for (int i = 0; i < 4; i++)
+    {
+      currentSensorData.fsr_values[i] = 0;
+    }
     currentSensorData.fsr_value = 0;
   }
 }
@@ -396,12 +517,39 @@ void handleFallDetected()
 
   Serial.println("\n!!! FALL DETECTED !!!");
 
+  // Update confidence scorer with fall detection data
+  confidenceScorer.resetScore();
+  confidenceScorer.startScoring();
+
+  // Score based on detected fall stages
+  // Stage 1: Free fall (assume 100ms duration, 0.3g min)
+  confidenceScorer.addStage1Score(100.0f, 0.3f);
+
+  // Stage 2: Impact (use actual impact magnitude from detector)
+  float impact_g = 7.0f; // Typical fall impact
+  confidenceScorer.addStage2Score(impact_g, 100.0f, true);
+
+  // Stage 3: Rotation (skipped, use default)
+  confidenceScorer.addStage3Score(0.0f, 0.0f);
+
+  // Stage 4: Inactivity (2000ms as configured)
+  confidenceScorer.addStage4Score(2000.0f, true);
+
+  // Add physiological validation from MAX30102 if available
+  if (heartRateSensor.isInitialized() && currentSensorData.heart_rate > 0)
+  {
+    uint16_t baseline_hr = heartRateSensor.getBaselineHeartRate();
+    confidenceScorer.addPhysiologicalScore(currentSensorData.heart_rate,
+                                           currentSensorData.spo2,
+                                           baseline_hr);
+  }
+
   // Get confidence score from fall detector
   uint8_t confidence = confidenceScorer.getTotalScore();
 
   Serial.print("Confidence Score: ");
   Serial.print(confidence);
-  Serial.println("/105");
+  Serial.println("/100");
 
   // Prepare emergency data
   EmergencyData_t emergencyData;
@@ -427,7 +575,7 @@ void handleFallDetected()
     activateFullAlert(false);
   }
 
-  // Send emergency alert via WiFi/BLE
+  // Send emergency alert via WiFi
   Serial.println("\n--- Transmitting Emergency Alert ---");
 
   // Audio announcement
@@ -540,55 +688,10 @@ void handleSOSButton()
   alertActive = false;
 }
 
-void handleBLECommand(uint8_t command, uint8_t *data, size_t length)
-{
-  switch (command)
-  {
-  case BLE_CMD_CANCEL_ALERT:
-    Serial.println("[App] Cancel alert command received");
-    deactivateFullAlert();
-    fallDetector.resetDetection();
-    emergencyComms.clearPendingAlert();
-    alertActive = false;
-    audioManager.playPattern(ALERT_PATTERN_CANCEL);
-    break;
-
-  case BLE_CMD_TEST_ALERT:
-    Serial.println("[App] Test alert command received");
-    audioManager.playFallDetectedSequence();
-    activateFullAlert(true);
-    delay(2000);
-    deactivateFullAlert();
-    break;
-
-  case BLE_CMD_GET_STATUS:
-    Serial.println("[App] Status request received");
-    updateSystemStatus();
-    bleServer.sendStatusUpdate(systemStatus);
-    break;
-
-  case BLE_CMD_START_STREAMING:
-    Serial.println("[App] Start streaming command");
-    audioManager.playConfirmationTone();
-    break;
-
-  case BLE_CMD_STOP_STREAMING:
-    Serial.println("[App] Stop streaming command");
-    audioManager.playConfirmationTone();
-    break;
-
-  default:
-    break;
-  }
-}
-
 void activateFullAlert(bool immediate)
 {
   // Visual alert
   digitalWrite(VISUAL_ALERT_PIN, HIGH);
-
-  // Haptic alert
-  digitalWrite(HAPTIC_PIN, HIGH);
 
   // Audio alert
   if (immediate)
@@ -603,7 +706,6 @@ void activateFullAlert(bool immediate)
 
 void deactivateFullAlert()
 {
-  digitalWrite(HAPTIC_PIN, LOW);
   digitalWrite(VISUAL_ALERT_PIN, LOW);
   audioManager.stopPattern();
 }
@@ -611,7 +713,6 @@ void deactivateFullAlert()
 void updateSystemStatus()
 {
   systemStatus.wifi_connected = wifiManager.isConnected();
-  systemStatus.bluetooth_connected = bleServer.isConnected();
   systemStatus.battery_percentage = readBatteryLevel();
   systemStatus.current_status = fallDetector.getCurrentStatus();
   systemStatus.uptime_ms = millis();
@@ -638,13 +739,16 @@ void printSystemInfo()
   Serial.print("Device ID: ");
   Serial.println(deviceID);
   wifiManager.printConnectionInfo();
-  bleServer.printConnectionInfo();
   emergencyComms.printStatus();
   Serial.print("Audio System: ");
   Serial.println(audioManager.isInitialized() ? "Active" : "Inactive");
   Serial.print("Audio Volume: ");
   Serial.print(audioManager.getVolume());
   Serial.println("%");
+  if (heartRateSensor.isInitialized())
+  {
+    heartRateSensor.printInfo();
+  }
   Serial.println("========================================\n");
 }
 
@@ -669,12 +773,27 @@ void printSensorData()
   Serial.print(currentSensorData.pressure, 2);
   Serial.println(" hPa");
 
-  Serial.print("Heart Rate: ");
-  Serial.print(currentSensorData.heart_rate, 1);
-  Serial.println(" BPM");
-
-  Serial.print("FSR: ");
+  Serial.print("FSR1: ");
+  Serial.print(currentSensorData.fsr_values[0]);
+  Serial.print(", FSR2: ");
+  Serial.print(currentSensorData.fsr_values[1]);
+  Serial.print(", FSR3: ");
+  Serial.print(currentSensorData.fsr_values[2]);
+  Serial.print(", FSR4: ");
+  Serial.println(currentSensorData.fsr_values[3]);
+  Serial.print("FSR Max: ");
   Serial.println(currentSensorData.fsr_value);
+
+  if (heartRateSensor.isInitialized())
+  {
+    Serial.print("Heart Rate: ");
+    Serial.print(currentSensorData.heart_rate);
+    Serial.print(" BPM, SpO2: ");
+    Serial.print(currentSensorData.spo2);
+    Serial.print("%, Temp: ");
+    Serial.print(currentSensorData.heart_rate_temperature, 1);
+    Serial.println(" °C");
+  }
 
   Serial.print("Battery: ");
   Serial.print(systemStatus.battery_percentage, 1);

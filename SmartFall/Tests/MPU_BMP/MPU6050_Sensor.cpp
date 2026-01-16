@@ -74,4 +74,3 @@ void MPU6050_Sensor::printInfo() {
         case MPU6050_RANGE_2000_DEG: Serial.println("2000°/s"); break;
     }
 }
-

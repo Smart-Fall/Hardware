@@ -1,7 +1,10 @@
 #include "MPU6050_Sensor.h"
 
 MPU6050_Sensor::MPU6050_Sensor(uint8_t sda, uint8_t scl)
-    : initialized(false), sda_pin(sda), scl_pin(scl) {
+    : initialized(false), sda_pin(sda), scl_pin(scl),
+      gyro_offset_x(0), gyro_offset_y(0), gyro_offset_z(0),
+      accel_offset_x(0), accel_offset_y(0), accel_offset_z(0),
+      calibrated(false) {
 }
 
 bool MPU6050_Sensor::begin() {
@@ -42,9 +45,83 @@ bool MPU6050_Sensor::readData(float &accel_x, float &accel_y, float &accel_z,
     gyro_y = g.gyro.y;
     gyro_z = g.gyro.z;
 
+    // Apply calibration offsets if calibrated
+    if (calibrated) {
+        accel_x -= accel_offset_x;
+        accel_y -= accel_offset_y;
+        accel_z -= accel_offset_z;
+
+        gyro_x -= gyro_offset_x;
+        gyro_y -= gyro_offset_y;
+        gyro_z -= gyro_offset_z;
+    }
+
     temp = t.temperature;
 
     return true;
+}
+
+void MPU6050_Sensor::calibrate(uint16_t samples) {
+    if (!initialized) {
+        Serial.println("MPU6050 not initialized. Cannot calibrate.");
+        return;
+    }
+
+    Serial.println("Calibrating MPU6050 - keep sensor stationary...");
+    delay(2000);  // Give user time to stabilize sensor
+
+    float sum_gyro_x = 0, sum_gyro_y = 0, sum_gyro_z = 0;
+    float sum_accel_x = 0, sum_accel_y = 0, sum_accel_z = 0;
+
+    Serial.print("Taking ");
+    Serial.print(samples);
+    Serial.println(" samples...");
+
+    for (uint16_t i = 0; i < samples; i++) {
+        sensors_event_t a, g, t;
+        mpu.getEvent(&a, &g, &t);
+
+        sum_accel_x += a.acceleration.x / 9.81;
+        sum_accel_y += a.acceleration.y / 9.81;
+        sum_accel_z += a.acceleration.z / 9.81;
+
+        sum_gyro_x += g.gyro.x;
+        sum_gyro_y += g.gyro.y;
+        sum_gyro_z += g.gyro.z;
+
+        delay(5);  // Small delay between samples
+    }
+
+    // Calculate average offsets
+    gyro_offset_x = sum_gyro_x / samples;
+    gyro_offset_y = sum_gyro_y / samples;
+    gyro_offset_z = sum_gyro_z / samples;
+
+    accel_offset_x = sum_accel_x / samples;
+    accel_offset_y = sum_accel_y / samples;
+    // For Z-axis, we expect 1g when stationary (gravity), so offset from 1g
+    accel_offset_z = (sum_accel_z / samples) - 1.0;
+
+    calibrated = true;
+
+    Serial.println("MPU6050 Calibration complete!");
+    Serial.print("Gyro offsets (rad/s): X=");
+    Serial.print(gyro_offset_x, 4);
+    Serial.print(", Y=");
+    Serial.print(gyro_offset_y, 4);
+    Serial.print(", Z=");
+    Serial.println(gyro_offset_z, 4);
+
+    Serial.print("Accel offsets (g): X=");
+    Serial.print(accel_offset_x, 4);
+    Serial.print(", Y=");
+    Serial.print(accel_offset_y, 4);
+    Serial.print(", Z=");
+    Serial.println(accel_offset_z, 4);
+}
+
+bool MPU6050_Sensor::isCalibrated() {
+    return calibrated;
 }
 
 bool MPU6050_Sensor::isInitialized() {

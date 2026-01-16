@@ -3,37 +3,45 @@
 
 #include <Arduino.h>
 #include <Wire.h>
-#include <MAX30105.h>
-#include <heartRate.h>
+#include <DFRobot_BloodOxygen_S.h>
 
-class MAX30102_Sensor {
+class MAX30102Sensor
+{
 private:
-    MAX30105 particleSensor;
+    DFRobot_BloodOxygen_S_I2C heartRateSensor;
     bool initialized;
     uint8_t sda_pin;
     uint8_t scl_pin;
-    uint8_t rst_pin;
 
-    const byte RATE_SIZE = 4;
-    byte rates[4];
-    byte rateSpot;
-    long lastBeat;
-    float beatsPerMinute;
-    int beatAvg;
+    // Data buffering for stability
+    uint16_t heart_rate_buffer[5];
+    uint8_t spo2_buffer[5];
+    uint8_t buffer_index;
+    uint32_t last_read_time;
+
+    // Baseline values for change detection
+    uint16_t baseline_heart_rate;
+    uint8_t baseline_spo2;
+    bool baseline_set;
 
 public:
-    MAX30102_Sensor(uint8_t sda = 22, uint8_t scl = 20, uint8_t rst = 21);
+    MAX30102Sensor(uint8_t sda = 22, uint8_t scl = 20);
 
-    bool begin();
-    void configure(byte ledBrightness = 60,
-                   byte sampleAverage = 4,
-                   byte ledMode = 2,
-                   int sampleRate = 100,
-                   int pulseWidth = 411,
-                   int adcRange = 4096);
+    bool begin(uint8_t address = 0x57);
+    void configure();
 
-    bool readHeartRate(float &bpm, bool &finger_detected);
-    long getIRValue();
+    bool readData(uint16_t &heart_rate, uint8_t &spo2, float &temperature);
+    bool getRawData(uint16_t &heart_rate, uint8_t &spo2);
+    float getTemperature();
+
+    void setBaselineHeartRate(uint16_t baseline);
+    void setBaselineSPO2(uint8_t baseline);
+    uint16_t getBaselineHeartRate();
+    uint8_t getBaselineSPO2();
+
+    void resetBaseline();
+    void startCollection();
+    void stopCollection();
 
     bool isInitialized();
     void printInfo();
