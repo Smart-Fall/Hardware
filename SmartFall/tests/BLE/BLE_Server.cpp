@@ -4,13 +4,16 @@
 static bool g_deviceConnected = false;
 
 // Callback class for server events
-class ServerCallbacks: public BLEServerCallbacks {
-    void onConnect(BLEServer* pServer) {
+class ServerCallbacks : public BLEServerCallbacks
+{
+    void onConnect(BLEServer *pServer)
+    {
         g_deviceConnected = true;
         Serial.println("\n[BLE] Client connected!");
     }
 
-    void onDisconnect(BLEServer* pServer) {
+    void onDisconnect(BLEServer *pServer)
+    {
         g_deviceConnected = false;
         Serial.println("\n[BLE] Client disconnected!");
         // Restart advertising
@@ -20,42 +23,47 @@ class ServerCallbacks: public BLEServerCallbacks {
 };
 
 // Callback class for characteristic writes
-class CommandCallbacks: public BLECharacteristicCallbacks {
-    void onWrite(BLECharacteristic* pCharacteristic) {
+class CommandCallbacks : public BLECharacteristicCallbacks
+{
+    void onWrite(BLECharacteristic *pCharacteristic)
+    {
         std::string value = pCharacteristic->getValue().c_str();
 
-        if (value.length() > 0) {
+        if (value.length() > 0)
+        {
             Serial.print("[BLE] Command received: 0x");
             Serial.println((uint8_t)value[0], HEX);
 
-            switch ((uint8_t)value[0]) {
-                case BLE_CMD_CANCEL_ALERT:
-                    Serial.println("  → Cancel Alert");
-                    break;
-                case BLE_CMD_TEST_ALERT:
-                    Serial.println("  → Test Alert");
-                    break;
-                case BLE_CMD_GET_STATUS:
-                    Serial.println("  → Get Status");
-                    break;
-                case BLE_CMD_GET_CONFIG:
-                    Serial.println("  → Get Config");
-                    break;
-                case BLE_CMD_START_STREAMING:
-                    Serial.println("  → Start Streaming");
-                    break;
-                case BLE_CMD_STOP_STREAMING:
-                    Serial.println("  → Stop Streaming");
-                    break;
-                default:
-                    Serial.println("  → Unknown Command");
-                    break;
+            switch ((uint8_t)value[0])
+            {
+            case BLE_CMD_CANCEL_ALERT:
+                Serial.println("  → Cancel Alert");
+                break;
+            case BLE_CMD_TEST_ALERT:
+                Serial.println("  → Test Alert");
+                break;
+            case BLE_CMD_GET_STATUS:
+                Serial.println("  → Get Status");
+                break;
+            case BLE_CMD_GET_CONFIG:
+                Serial.println("  → Get Config");
+                break;
+            case BLE_CMD_START_STREAMING:
+                Serial.println("  → Start Streaming");
+                break;
+            case BLE_CMD_STOP_STREAMING:
+                Serial.println("  → Stop Streaming");
+                break;
+            default:
+                Serial.println("  → Unknown Command");
+                break;
             }
         }
     }
 };
 
-BLE_Server::BLE_Server() {
+BLE_Server::BLE_Server()
+{
     pServer = nullptr;
     pService = nullptr;
     pEmergencyChar = nullptr;
@@ -68,7 +76,8 @@ BLE_Server::BLE_Server() {
     deviceName = "SmartFall";
 }
 
-bool BLE_Server::begin(const char* device_name) {
+bool BLE_Server::begin(const char *device_name)
+{
     deviceName = String(device_name);
 
     Serial.print("Initializing BLE Server: ");
@@ -87,45 +96,40 @@ bool BLE_Server::begin(const char* device_name) {
     // Create Emergency Characteristic (Notify)
     pEmergencyChar = pService->createCharacteristic(
         EMERGENCY_CHARACTERISTIC,
-        BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY
-    );
+        BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY);
     pEmergencyChar->addDescriptor(new BLE2902());
 
     // Create Sensor Data Characteristic (Notify)
     pSensorChar = pService->createCharacteristic(
         SENSOR_CHARACTERISTIC,
-        BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY
-    );
+        BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY);
     pSensorChar->addDescriptor(new BLE2902());
 
     // Create Status Characteristic (Read/Notify)
     pStatusChar = pService->createCharacteristic(
         STATUS_CHARACTERISTIC,
-        BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY
-    );
+        BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY);
     pStatusChar->addDescriptor(new BLE2902());
 
     // Create Command Characteristic (Write)
     pCommandChar = pService->createCharacteristic(
         COMMAND_CHARACTERISTIC,
-        BLECharacteristic::PROPERTY_WRITE
-    );
+        BLECharacteristic::PROPERTY_WRITE);
     pCommandChar->setCallbacks(new CommandCallbacks());
 
     // Create Config Characteristic (Read/Write)
     pConfigChar = pService->createCharacteristic(
         CONFIG_CHARACTERISTIC,
-        BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_WRITE
-    );
+        BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_WRITE);
 
     // Start the service
     pService->start();
 
     // Start advertising
-    BLEAdvertising* pAdvertising = BLEDevice::getAdvertising();
+    BLEAdvertising *pAdvertising = BLEDevice::getAdvertising();
     pAdvertising->addServiceUUID(SERVICE_UUID);
     pAdvertising->setScanResponse(true);
-    pAdvertising->setMinPreferred(0x06);  // Functions that help with iPhone connections issue
+    pAdvertising->setMinPreferred(0x06); // Functions that help with iPhone connections issue
     pAdvertising->setMinPreferred(0x12);
     BLEDevice::startAdvertising();
 
@@ -137,13 +141,16 @@ bool BLE_Server::begin(const char* device_name) {
     return true;
 }
 
-bool BLE_Server::isConnected() {
+bool BLE_Server::isConnected()
+{
     deviceConnected = g_deviceConnected;
     return deviceConnected;
 }
 
-bool BLE_Server::sendEmergency(const String& message) {
-    if (!initialized) {
+bool BLE_Server::sendEmergency(const String &message)
+{
+    if (!initialized)
+    {
         Serial.println("Error: BLE not initialized!");
         return false;
     }
@@ -157,8 +164,10 @@ bool BLE_Server::sendEmergency(const String& message) {
     return true;
 }
 
-bool BLE_Server::sendSensorData(const String& data) {
-    if (!initialized) {
+bool BLE_Server::sendSensorData(const String &data)
+{
+    if (!initialized)
+    {
         Serial.println("Error: BLE not initialized!");
         return false;
     }
@@ -169,8 +178,10 @@ bool BLE_Server::sendSensorData(const String& data) {
     return true;
 }
 
-bool BLE_Server::sendStatus(const String& status) {
-    if (!initialized) {
+bool BLE_Server::sendStatus(const String &status)
+{
+    if (!initialized)
+    {
         Serial.println("Error: BLE not initialized!");
         return false;
     }
@@ -184,7 +195,8 @@ bool BLE_Server::sendStatus(const String& status) {
     return true;
 }
 
-void BLE_Server::printConnectionInfo() {
+void BLE_Server::printConnectionInfo()
+{
     Serial.println("\n=== BLE Connection Info ===");
     Serial.print("Device Name: ");
     Serial.println(deviceName);
@@ -202,6 +214,7 @@ void BLE_Server::printConnectionInfo() {
     Serial.println("===========================\n");
 }
 
-int BLE_Server::getConnectedDevices() {
+int BLE_Server::getConnectedDevices()
+{
     return pServer->getConnectedCount();
 }
