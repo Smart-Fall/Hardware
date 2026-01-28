@@ -1,7 +1,10 @@
 #include "MPU6050_Sensor.h"
+#include "Board_Config.h"
 
 MPU6050_Sensor::MPU6050_Sensor(uint8_t sda, uint8_t scl)
-    : initialized(false), sda_pin(sda), scl_pin(scl),
+    : initialized(false),
+      sda_pin(sda == 255 ? Board_Config::getSDA() : sda),
+      scl_pin(scl == 255 ? Board_Config::getSCL() : scl),
       gyro_offset_x(0), gyro_offset_y(0), gyro_offset_z(0),
       accel_offset_x(0), accel_offset_y(0), accel_offset_z(0),
       calibrated(false) {

@@ -1,13 +1,19 @@
 /*
  * MAX30102 Heart Rate & SpO2 Sensor Test
- * ESP32 Feather V2
  *
- * Wiring:
- * MAX30102 VCC -> 3.3V
- * MAX30102 GND -> GND
- * MAX30102 SDA -> GPIO 22
- * MAX30102 SCL -> GPIO 20
- * MAX30102 RST -> GPIO 21 (A9)
+ * MODE SELECTION:
+ *   Edit SmartFall/Utils/Config.h
+ *   Uncomment '#define MAX30102_USE_UART' for UART mode
+ *   Comment it (default) for I2C mode
+ *
+ * WIRING (I2C - Default):
+ *   VCC -> 3.3V, GND -> GND
+ *   SDA/SCL auto-detected by Board_Config
+ *
+ * WIRING (UART):
+ *   VCC -> 3.3V, GND -> GND
+ *   Sensor TX -> ESP32 GPIO 16 (RX)
+ *   Sensor RX -> ESP32 GPIO 17 (TX)
  *
  * Instructions:
  * 1. Upload this sketch to your ESP32
@@ -17,6 +23,7 @@
  * 5. Observe heart rate (BPM) and SpO2 (%) values
  */
 
+#include "Board_Config.h"
 #include "MAX30102_Sensor.h"
 
 MAX30102Sensor heartRateSensor;
@@ -32,11 +39,28 @@ uint8_t maxSpO2 = 0;
 void setup()
 {
     Serial.begin(115200);
-    delay(2000);
+    Serial.println("1s");
+    delay(1000);
+    Serial.println("2s");
+    delay(1000);
+    Serial.println("3s");
+    delay(1000);
+    Serial.println("4s");
+    delay(1000);
+    Serial.println("5s");
+    delay(1000);
 
     Serial.println("\n========================================");
-    Serial.println("    MAX30102 Heart Rate & SpO2 Test");
+    Serial.println("      MAX30102 Test");
+    #ifdef MAX30102_USE_UART
+        Serial.println("         UART Mode");
+    #else
+        Serial.println("         I2C Mode");
+    #endif
     Serial.println("========================================\n");
+
+    // Initialize board detection
+    Board_Config::begin();
 
     Serial.println("Initializing MAX30102 sensor...");
 
@@ -44,7 +68,7 @@ void setup()
     {
         Serial.println("ERROR: MAX30102 initialization failed!");
         Serial.println("Troubleshooting:");
-        Serial.println("  1. Check I2C wiring (SDA=GPIO22, SCL=GPIO20)");
+        Serial.println("  1. Check I2C wiring (pins shown in board detection above)");
         Serial.println("  2. Verify 3.3V power connection");
         Serial.println("  3. Try different I2C address if needed");
         while (1)

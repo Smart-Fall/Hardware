@@ -58,8 +58,8 @@ public:
     bool sendEmergencyAlert(const EmergencyData_t& emergency_data, bool urgent);
 
     // Status updates
-    bool sendStatusUpdate(const SystemStatus_t& status_data);
-    bool sendSensorData(const SensorData_t& sensor_data);
+    bool sendStatusUpdate(const SystemStatus_t& status_data, const char* device_id = nullptr);
+    bool sendSensorData(const SensorData_t& sensor_data, const char* device_id = nullptr);
 
     // Alert management
     void processAlertQueue();  // Call in loop to handle retries

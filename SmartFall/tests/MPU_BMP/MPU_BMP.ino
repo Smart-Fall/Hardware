@@ -3,31 +3,28 @@
  *
  * Test program using modular MPU6050_Sensor and BMP280_Sensor classes
  *
- * Hardware: ESP32 Feather V2
+ * Hardware: ESP32 Feather V2 / ESP32 HUZZAH32 Feather
  * Sensors: MPU6050Sensor (Accelerometer + Gyroscope) + BMP280Sensor (Pressure + Temperature)
  *
  * Wiring (I2C shared bus):
  * MPU6050Sensor VCC -> 3.3V
  * MPU6050Sensor GND -> GND
- * MPU6050Sensor SDA -> GPIO 22
- * MPU6050Sensor SCL -> GPIO 20
+ * MPU6050Sensor SDA -> Auto-detected based on board
+ * MPU6050Sensor SCL -> Auto-detected based on board
  *
  * BMP280Sensor VCC -> 3.3V
  * BMP280Sensor GND -> GND
- * BMP280Sensor SDA -> GPIO 22 (shared)
- * BMP280Sensor SCL -> GPIO 20 (shared)
+ * BMP280Sensor SDA -> Auto-detected based on board (shared)
+ * BMP280Sensor SCL -> Auto-detected based on board (shared)
  */
 
+#include "Board_Config.h"
 #include "MPU6050_Sensor.h"
 #include "BMP280_Sensor.h"
 
-// Pin definitions for ESP32 HUZZAH32
-#define SDA_PIN 23
-#define SCL_PIN 22
-
-// Create sensor objects
-MPU6050_Sensor imuSensor(SDA_PIN, SCL_PIN);
-BMP280_Sensor pressureSensor(SDA_PIN, SCL_PIN);
+// Create sensor objects (using auto-detected pins)
+MPU6050_Sensor imuSensor;
+BMP280_Sensor pressureSensor;
 
 void setup() {
   // Initialize serial communication
@@ -35,6 +32,9 @@ void setup() {
   delay(2000);  // Wait for serial monitor
 
   Serial.println("\n=== MPU6050Sensor + BMP280Sensor Combined Test ===\n");
+
+  // Initialize board detection
+  Board_Config::begin();
 
   // Initialize MPU6050
   Serial.println("--- Initializing MPU6050Sensor ---");

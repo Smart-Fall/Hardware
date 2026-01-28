@@ -1,14 +1,15 @@
 /*
  * MPU6050Sensor Sensor Test
- * ESP32 Feather V2
+ * ESP32 Feather V2 / ESP32 HUZZAH32 Feather
  *
  * Wiring:
  * MPU6050Sensor VCC -> 3.3V
  * MPU6050Sensor GND -> GND
- * MPU6050Sensor SDA -> GPIO 22
- * MPU6050Sensor SCL -> GPIO 20
+ * MPU6050Sensor SDA -> Auto-detected based on board
+ * MPU6050Sensor SCL -> Auto-detected based on board
  */
 
+#include "Board_Config.h"
 #include "MPU6050_Sensor.h"
 
 MPU6050_Sensor mpu;
@@ -18,6 +19,9 @@ void setup() {
     delay(2000);
 
     Serial.println("\n=== MPU6050Sensor Test ===\n");
+
+    // Initialize board detection
+    Board_Config::begin();
 
     if (!mpu.begin()) {
         Serial.println("ERROR: MPU6050Sensor initialization failed!");

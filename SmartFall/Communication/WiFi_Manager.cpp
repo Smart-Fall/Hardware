@@ -233,12 +233,15 @@ bool WiFi_Manager::sendEmergencyAlert(const EmergencyData_t& emergency_data) {
     return success;
 }
 
-bool WiFi_Manager::sendStatusUpdate(const SystemStatus_t& status_data) {
+bool WiFi_Manager::sendStatusUpdate(const SystemStatus_t& status_data, const char* device_id) {
     if (!isConnected()) {
         return false;
     }
 
     DynamicJsonDocument doc(512);
+    if (device_id) {
+        doc["device_id"] = device_id;  // Use "SF-MACADDRESS" format from hardware
+    }
     doc["battery_level"] = status_data.battery_percentage;
     doc["wifi_connected"] = status_data.wifi_connected;
     doc["bluetooth_connected"] = status_data.bluetooth_connected;
@@ -263,12 +266,15 @@ bool WiFi_Manager::sendStatusUpdate(const SystemStatus_t& status_data) {
     return success;
 }
 
-bool WiFi_Manager::sendSensorData(const SensorData_t& sensor_data) {
+bool WiFi_Manager::sendSensorData(const SensorData_t& sensor_data, const char* device_id) {
     if (!isConnected()) {
         return false;
     }
 
     DynamicJsonDocument doc(512);
+    if (device_id) {
+        doc["device_id"] = device_id;  // Use "SF-MACADDRESS" format from hardware
+    }
     doc["accel_x"] = sensor_data.accel_x;
     doc["accel_y"] = sensor_data.accel_y;
     doc["accel_z"] = sensor_data.accel_z;

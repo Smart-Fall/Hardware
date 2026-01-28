@@ -1,7 +1,10 @@
 #include "MPU6050_Sensor.h"
+#include "Board_Config.h"
 
 MPU6050_Sensor::MPU6050_Sensor(uint8_t sda, uint8_t scl)
-    : initialized(false), sda_pin(sda), scl_pin(scl) {
+    : initialized(false),
+      sda_pin(sda == 255 ? Board_Config::getSDA() : sda),
+      scl_pin(scl == 255 ? Board_Config::getSCL() : scl) {
 }
 
 bool MPU6050_Sensor::begin() {

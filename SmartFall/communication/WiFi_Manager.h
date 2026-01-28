@@ -34,8 +34,8 @@ public:
 
     // Emergency and data transmission
     bool sendEmergencyAlert(const EmergencyData_t& emergency_data);
-    bool sendStatusUpdate(const SystemStatus_t& status_data);
-    bool sendSensorData(const SensorData_t& sensor_data);
+    bool sendStatusUpdate(const SystemStatus_t& status_data, const char* device_id = nullptr);
+    bool sendSensorData(const SensorData_t& sensor_data, const char* device_id = nullptr);
 
     // Server connectivity
     bool pingServer();

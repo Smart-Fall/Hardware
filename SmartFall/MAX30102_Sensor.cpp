@@ -1,22 +1,53 @@
 #include "MAX30102_Sensor.h"
 
-MAX30102Sensor::MAX30102Sensor(uint8_t sda, uint8_t scl)
-    : heartRateSensor(&Wire, 0x57), initialized(false), sda_pin(sda), scl_pin(scl),
+#ifdef MAX30102_USE_UART
+MAX30102Sensor::MAX30102Sensor(uint8_t rx, uint8_t tx)
+    : heartRateSensor(&Serial1, MAX30102_UART_BAUD),
+      initialized(false),
+      rx_pin(rx == 255 ? MAX30102_UART_RX_PIN : rx),
+      tx_pin(tx == 255 ? MAX30102_UART_TX_PIN : tx),
       buffer_index(0), last_read_time(0), baseline_heart_rate(60), baseline_spo2(95), baseline_set(false)
 {
     // Initialize buffers
     memset(heart_rate_buffer, 0, sizeof(heart_rate_buffer));
     memset(spo2_buffer, 0, sizeof(spo2_buffer));
 }
+#else
+MAX30102Sensor::MAX30102Sensor(uint8_t sda, uint8_t scl)
+    : heartRateSensor(&Wire, MAX30102_I2C_ADDRESS), initialized(false), sda_pin(sda), scl_pin(scl),
+      buffer_index(0), last_read_time(0), baseline_heart_rate(60), baseline_spo2(95), baseline_set(false)
+{
+    // Initialize buffers
+    memset(heart_rate_buffer, 0, sizeof(heart_rate_buffer));
+    memset(spo2_buffer, 0, sizeof(spo2_buffer));
+}
+#endif
 
 bool MAX30102Sensor::begin(uint8_t address)
 {
-    // Initialize I2C if not already done
-    if (!Wire.begin(sda_pin, scl_pin))
-    {
-        Serial.println("Failed to initialize I2C for MAX30102");
-        return false;
-    }
+    #ifdef MAX30102_USE_UART
+        // Initialize UART
+        Serial1.begin(MAX30102_UART_BAUD, SERIAL_8N1, rx_pin, tx_pin);
+        Serial.println("========================================");
+        Serial.println("  MAX30102 UART Mode (Modbus RTU)");
+        Serial.println("========================================");
+        Serial.print("RX Pin: GPIO ");
+        Serial.println(rx_pin);
+        Serial.print("TX Pin: GPIO ");
+        Serial.println(tx_pin);
+        Serial.print("Baud:   ");
+        Serial.println(MAX30102_UART_BAUD);
+        Serial.println("========================================\n");
+        delay(100);
+    #else
+        // Initialize I2C
+        if (!Wire.begin(sda_pin, scl_pin))
+        {
+            Serial.println("ERROR: Failed to initialize I2C for MAX30102");
+            return false;
+        }
+        Serial.println("MAX30102 I2C Mode");
+    #endif
 
     // Initialize sensor with retries
     uint8_t retries = 3;
@@ -25,9 +56,12 @@ bool MAX30102Sensor::begin(uint8_t address)
         if (heartRateSensor.begin())
         {
             initialized = true;
-            Serial.println("MAX30102 sensor initialized successfully");
+            #ifdef MAX30102_USE_UART
+                Serial.println("✓ MAX30102 initialized (UART mode)");
+            #else
+                Serial.println("✓ MAX30102 initialized (I2C mode)");
+            #endif
 
-            // Start data collection
             startCollection();
             delay(100);
             return true;
@@ -35,7 +69,14 @@ bool MAX30102Sensor::begin(uint8_t address)
         delay(500);
     }
 
-    Serial.println("ERROR: MAX30102 initialization failed after retries");
+    #ifdef MAX30102_USE_UART
+        Serial.println("ERROR: MAX30102 init failed (UART mode)");
+        Serial.println("Check: UART wiring, power, sensor mode, baud rate");
+    #else
+        Serial.println("ERROR: MAX30102 init failed (I2C mode)");
+        Serial.println("Check: I2C wiring, power, address 0x57");
+    #endif
+
     initialized = false;
     return false;
 }
@@ -176,16 +217,28 @@ void MAX30102Sensor::printInfo()
     }
 
     Serial.println("\n--- MAX30102 Sensor Info ---");
-    Serial.print("Status: ");
-    Serial.println(initialized ? "INITIALIZED" : "NOT INITIALIZED");
-    Serial.print("Baseline Heart Rate: ");
+
+    #ifdef MAX30102_USE_UART
+        Serial.println("Mode: UART (Modbus RTU)");
+        Serial.print("Pins: RX=GPIO ");
+        Serial.print(rx_pin);
+        Serial.print(", TX=GPIO ");
+        Serial.println(tx_pin);
+        Serial.print("Baud: ");
+        Serial.println(MAX30102_UART_BAUD);
+    #else
+        Serial.println("Mode: I2C");
+        Serial.print("Pins: SDA=GPIO ");
+        Serial.print(sda_pin);
+        Serial.print(", SCL=GPIO ");
+        Serial.println(scl_pin);
+    #endif
+
+    Serial.print("Baseline HR: ");
     Serial.print(baseline_heart_rate);
     Serial.println(" BPM");
     Serial.print("Baseline SpO2: ");
     Serial.print(baseline_spo2);
     Serial.println(" %");
-    Serial.print("Temperature: ");
-    Serial.print(getTemperature());
-    Serial.println(" °C");
     Serial.println("----------------------------\n");
 }

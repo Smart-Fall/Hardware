@@ -32,7 +32,7 @@
 // MAX30102 Heart Rate Sensor Communication Configuration
 // To use UART mode: Uncomment the line below
 // To use I2C mode (default): Keep the line commented
-// #define MAX30102_USE_UART
+#define MAX30102_USE_UART
 
 #ifdef MAX30102_USE_UART
   // UART Configuration (Modbus RTU)

@@ -11,6 +11,7 @@
  */
 
 #include <esp_mac.h> // For MAC address functions in ESP32 core 3.x
+#include "SmartFall/utils/Board_Config.h"
 #include "MPU6050.h"
 #include "BMP280.h"
 #include "FSR.h"
@@ -67,6 +68,9 @@ void setup()
 
   // Generate device ID from MAC address
   generateDeviceID();
+
+  // Initialize board detection and configure I2C pins
+  Board_Config::begin();
 
   // Initialize SOS button
   pinMode(SOS_BUTTON_PIN, INPUT_PULLUP);
@@ -238,7 +242,7 @@ void loop()
   { // Every minute
     lastStatusUpdate = currentTime;
     updateSystemStatus();
-    emergencyComms.sendStatusUpdate(systemStatus);
+    emergencyComms.sendStatusUpdate(systemStatus, deviceID);
 
     // Check battery level
     if (systemStatus.battery_percentage < 20.0)

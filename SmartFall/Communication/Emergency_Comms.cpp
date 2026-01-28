@@ -137,7 +137,7 @@ bool Emergency_Comms::sendEmergencyAlert(const EmergencyData_t& emergency_data, 
     return (wifi_success || ble_success);
 }
 
-bool Emergency_Comms::sendStatusUpdate(const SystemStatus_t& status_data) {
+bool Emergency_Comms::sendStatusUpdate(const SystemStatus_t& status_data, const char* device_id) {
     if (!initialized) return false;
 
     bool success = false;
@@ -151,7 +151,7 @@ bool Emergency_Comms::sendStatusUpdate(const SystemStatus_t& status_data) {
     strncpy(status_packet.status_message, "Status update", sizeof(status_packet.status_message));
 
     if (wifi_enabled && wifi_manager != nullptr && wifi_manager->isConnected()) {
-        success |= wifi_manager->sendStatusUpdate(status_packet);
+        success |= wifi_manager->sendStatusUpdate(status_packet, device_id);
     }
 
     if (ble_enabled && ble_server != nullptr && ble_server->isConnected()) {
@@ -161,13 +161,13 @@ bool Emergency_Comms::sendStatusUpdate(const SystemStatus_t& status_data) {
     return success;
 }
 
-bool Emergency_Comms::sendSensorData(const SensorData_t& sensor_data) {
+bool Emergency_Comms::sendSensorData(const SensorData_t& sensor_data, const char* device_id) {
     if (!initialized) return false;
 
     bool success = false;
 
     if (wifi_enabled && wifi_manager != nullptr && wifi_manager->isConnected()) {
-        success |= wifi_manager->sendSensorData(sensor_data);
+        success |= wifi_manager->sendSensorData(sensor_data, device_id);
     }
 
     if (ble_enabled && ble_server != nullptr && ble_server->isStreaming()) {

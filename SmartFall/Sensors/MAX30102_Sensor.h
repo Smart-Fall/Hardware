@@ -3,15 +3,23 @@
 
 #include <Arduino.h>
 #include <Wire.h>
+#include <HardwareSerial.h>
 #include <DFRobot_BloodOxygen_S.h>
+#include "../Utils/Config.h"
 
 class MAX30102_Sensor
 {
 private:
-    DFRobot_BloodOxygen_S_I2C heartRateSensor;
+    #ifdef MAX30102_USE_UART
+        DFRobot_BloodOxygen_S_HardWareUart heartRateSensor;
+        uint8_t rx_pin;
+        uint8_t tx_pin;
+    #else
+        DFRobot_BloodOxygen_S_I2C heartRateSensor;
+        uint8_t sda_pin;
+        uint8_t scl_pin;
+    #endif
     bool initialized;
-    uint8_t sda_pin;
-    uint8_t scl_pin;
 
     // Data buffering for stability
     uint16_t heart_rate_buffer[5];
@@ -25,7 +33,11 @@ private:
     bool baseline_set;
 
 public:
-    MAX30102_Sensor(uint8_t sda = 22, uint8_t scl = 20);
+    #ifdef MAX30102_USE_UART
+        MAX30102_Sensor(uint8_t rx = 255, uint8_t tx = 255);
+    #else
+        MAX30102_Sensor(uint8_t sda = 255, uint8_t scl = 255);
+    #endif
 
     bool begin(uint8_t address = 0x57);
     void configure();
