@@ -507,7 +507,7 @@ uint8_t FallDetector::getHistoryCount()
     return history_count;
 }
 
-float FallDetector::getFreefalDuration()
+float FallDetector::getFreefallDuration()
 {
     return freefall_duration;
 }

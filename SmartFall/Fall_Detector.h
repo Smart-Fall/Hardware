@@ -67,7 +67,7 @@ public:
     // Data access functions
     SensorData_t *getSensorHistory();
     uint8_t getHistoryCount();
-    float getFreefalDuration();
+    float getFreefallDuration();
     float getMaxImpact();
     float getMaxRotation();
 
