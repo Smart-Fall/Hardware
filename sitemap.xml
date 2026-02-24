@@ -36,6 +36,11 @@
          <changefreq>daily</changefreq>
     </url>
     <url>
+         <loc>https://smart-fall.github.io/Hardware/assets/heroicons-reference/</loc>
+         <lastmod>2026-02-24</lastmod>
+         <changefreq>daily</changefreq>
+    </url>
+    <url>
          <loc>https://smart-fall.github.io/Hardware/configuration/config-reference/</loc>
          <lastmod>2026-02-24</lastmod>
          <changefreq>daily</changefreq>
