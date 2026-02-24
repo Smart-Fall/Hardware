@@ -1,3 +1,5 @@
+![SmartFall Logo](assets/logo.png){ align=center width="300" }
+
 # SmartFall Hardware Documentation
 
 Welcome to the **SmartFall Hardware** documentation. SmartFall is a comprehensive IoT wearable fall detection system using the ESP32 Feather microcontroller with multi-sensor data fusion and emergency alert capabilities.
