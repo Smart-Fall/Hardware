@@ -31,15 +31,15 @@
     D --&gt; R</code></pre> <h2 id=timing-architecture>Timing Architecture<a class=headerlink href=#timing-architecture title="Permanent link">&para;</a></h2> <h3 id=sensor-data-acquisition>Sensor Data Acquisition<a class=headerlink href=#sensor-data-acquisition title="Permanent link">&para;</a></h3> <ul> <li><strong>Frequency</strong>: 100 Hz (10ms intervals)</li> <li><strong>Latency</strong>: &lt;5ms from sensor reading to algorithm processing</li> <li><strong>Resolution</strong>: Sufficient to capture fall dynamics</li> </ul> <h3 id=detection-window>Detection Window<a class=headerlink href=#detection-window title="Permanent link">&para;</a></h3> <ul> <li><strong>Primary</strong>: 10 seconds of active analysis</li> <li><strong>Extended</strong>: Additional 10 seconds in enhanced monitoring</li> <li><strong>History Buffer</strong>: Maintains last 100 samples (~1 second)</li> </ul> <h3 id=alert-response>Alert Response<a class=headerlink href=#alert-response title="Permanent link">&para;</a></h3> <ul> <li><strong>Detection to First Alert</strong>: &lt;2 seconds</li> <li><strong>Alert Duration</strong>: 5 seconds siren + 25 seconds wait</li> <li><strong>Total Response Window</strong>: 30 seconds</li> </ul> <h2 id=multi-stage-architecture>Multi-Stage Architecture<a class=headerlink href=#multi-stage-architecture title="Permanent link">&para;</a></h2> <h3 id=why-5-stages>Why 5 Stages?<a class=headerlink href=#why-5-stages title="Permanent link">&para;</a></h3> <p>A fall event follows a predictable physical sequence:</p> <pre class=mermaid><code>timeline
     title Real Fall Timeline - Temporal Sequence
     T0 : Initial loss of balance
-    T1 : Free fall begins&lt;br/&gt;Acceleration &amp;lt;0.5g
-    T2 : User rotates uncontrollably&lt;br/&gt;High angular velocity
-    T3 : Impact with ground&lt;br/&gt;Acceleration &amp;gt;3g
-    T4 : User remains incapacitated&lt;br/&gt;Acceleration 0.8-1.2g&lt;br/&gt;No movement</code></pre> <p>Each stage <strong>confirms the previous</strong> one: - No Stage 1 detected → <strong>Not a fall</strong> - No Stage 2 after Stage 1 → <strong>Not a fall</strong> - No Stage 3-4 sequence → <strong>Possible false positive</strong></p> <h3 id=stage-interdependencies>Stage Interdependencies<a class=headerlink href=#stage-interdependencies title="Permanent link">&para;</a></h3> <pre class=mermaid><code>graph TD
-    S1["Stage 1: Free Fall&lt;br/&gt;Acceleration &amp;lt;0.5g"]
-    S2["Stage 2: Impact&lt;br/&gt;Acceleration &amp;gt;3g"]
-    S3["Stage 3: Rotation&lt;br/&gt;Angular velocity &amp;gt;150°/s"]
-    S4["Stage 4: Inactivity&lt;br/&gt;0.8-1.2g for 2+ sec"]
-    S5["Stage 5: Filters&lt;br/&gt;BMP280, HR, FSR"]
+    T1 : Free fall begins (Accel &lt; 0.5g)
+    T2 : User rotates uncontrollably (High angular velocity)
+    T3 : Impact with ground (Accel &gt; 3g)
+    T4 : User remains incapacitated (Accel 0.8-1.2g, No movement)</code></pre> <p>Each stage <strong>confirms the previous</strong> one: - No Stage 1 detected → <strong>Not a fall</strong> - No Stage 2 after Stage 1 → <strong>Not a fall</strong> - No Stage 3-4 sequence → <strong>Possible false positive</strong></p> <h3 id=stage-interdependencies>Stage Interdependencies<a class=headerlink href=#stage-interdependencies title="Permanent link">&para;</a></h3> <pre class=mermaid><code>graph TD
+    S1["Stage 1: Free Fall&lt;br/&gt;(Accel less than 0.5g)"]
+    S2["Stage 2: Impact&lt;br/&gt;(Accel greater than 3g)"]
+    S3["Stage 3: Rotation&lt;br/&gt;(Angular velocity gt 150 deg/s)"]
+    S4["Stage 4: Inactivity&lt;br/&gt;(0.8-1.2g for 2+ sec)"]
+    S5["Stage 5: Filters&lt;br/&gt;(BMP280, HR, FSR)"]
 
     S1 --&gt;|Required for| S2
     S1 --&gt;|False positive filter| S1
