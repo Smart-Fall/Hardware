@@ -37,3 +37,32 @@ button .heroicon {
 .mermaid text {
   font-family: var(--md-font-family);
 }
+
+/* SmartFall Logo Styling */
+.md-header__logo {
+  padding: 0.5rem;
+}
+
+.md-header__logo img {
+  height: 60px;
+  width: auto;
+  padding: 0.5rem;
+  background-color: transparent;
+  border-radius: 8px;
+}
+
+/* Logo background in light mode */
+[data-md-color-scheme="default"] .md-header__logo img {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Logo background in dark mode */
+[data-md-color-scheme="slate"] .md-header__logo img {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+/* Hover effect */
+.md-header__logo img:hover {
+  background-color: rgba(255, 255, 255, 0.15);
+  transition: background-color 0.3s ease;
+}
