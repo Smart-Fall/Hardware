@@ -83,10 +83,10 @@ A fall event follows a predictable physical sequence:
 timeline
     title Real Fall Timeline - Temporal Sequence
     T0 : Initial loss of balance
-    T1 : Free fall begins<br/>Acceleration &lt;0.5g
-    T2 : User rotates uncontrollably<br/>High angular velocity
-    T3 : Impact with ground<br/>Acceleration &gt;3g
-    T4 : User remains incapacitated<br/>Acceleration 0.8-1.2g<br/>No movement
+    T1 : Free fall begins (Accel < 0.5g)
+    T2 : User rotates uncontrollably (High angular velocity)
+    T3 : Impact with ground (Accel > 3g)
+    T4 : User remains incapacitated (Accel 0.8-1.2g, No movement)
 ```
 
 Each stage **confirms the previous** one:
@@ -98,11 +98,11 @@ Each stage **confirms the previous** one:
 
 ```mermaid
 graph TD
-    S1["Stage 1: Free Fall<br/>Acceleration &lt;0.5g"]
-    S2["Stage 2: Impact<br/>Acceleration &gt;3g"]
-    S3["Stage 3: Rotation<br/>Angular velocity &gt;150°/s"]
-    S4["Stage 4: Inactivity<br/>0.8-1.2g for 2+ sec"]
-    S5["Stage 5: Filters<br/>BMP280, HR, FSR"]
+    S1["Stage 1: Free Fall<br/>(Accel less than 0.5g)"]
+    S2["Stage 2: Impact<br/>(Accel greater than 3g)"]
+    S3["Stage 3: Rotation<br/>(Angular velocity gt 150 deg/s)"]
+    S4["Stage 4: Inactivity<br/>(0.8-1.2g for 2+ sec)"]
+    S5["Stage 5: Filters<br/>(BMP280, HR, FSR)"]
 
     S1 -->|Required for| S2
     S1 -->|False positive filter| S1
