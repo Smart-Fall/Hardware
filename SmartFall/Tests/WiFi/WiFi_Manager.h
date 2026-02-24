@@ -3,6 +3,7 @@
 
 #include <WiFi.h>
 #include <HTTPClient.h>
+#include <WiFiClientSecure.h>
 #include <Arduino.h>
 
 class WiFi_Manager
@@ -15,6 +16,7 @@ private:
     unsigned long reconnectInterval;
     bool autoReconnect;
     bool initialized;
+    WiFiClientSecure secureClient;
 
 public:
     WiFi_Manager();

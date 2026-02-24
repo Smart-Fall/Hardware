@@ -19,7 +19,7 @@
 // WiFi Configuration - CHANGE THESE!
 #define WIFI_SSID "thaowifi"
 #define WIFI_PASSWORD "123456777"
-#define SERVER_URL "http://httpbin.org/post" // Test server
+#define SERVER_URL "https://smartfall.vercel.app/api/health" // Production backend
 
 WiFi_Manager wifiManager;
 

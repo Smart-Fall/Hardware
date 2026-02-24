@@ -1,4 +1,5 @@
 #include "WiFi_Manager.h"
+#include <WiFiClientSecure.h>
 
 WiFi_Manager::WiFi_Manager()
 {
@@ -104,7 +105,8 @@ bool WiFi_Manager::sendTestMessage(const String &message)
     }
 
     HTTPClient http;
-    http.begin(serverURL);
+    secureClient.setInsecure();
+    http.begin(secureClient, serverURL);
     http.addHeader("Content-Type", "text/plain");
 
     Serial.print("Sending test message to: ");
@@ -146,7 +148,8 @@ bool WiFi_Manager::sendJSON(const String &jsonPayload)
     }
 
     HTTPClient http;
-    http.begin(serverURL);
+    secureClient.setInsecure();
+    http.begin(secureClient, serverURL);
     http.addHeader("Content-Type", "application/json");
 
     Serial.println("Sending JSON payload:");
