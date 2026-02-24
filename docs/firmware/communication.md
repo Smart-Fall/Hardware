@@ -213,14 +213,28 @@ app.listen(3000, () => {
 
 ### BLE Server Architecture
 
-```
-SmartFall BLE Service
-├── Service UUID: 4fafc201-1fb5-459e-8fcc-c5c9c331914b
-├── Emergency Alert (Notify)
-├── Sensor Data (Notify)
-├── Status (Read/Notify)
-├── Command (Write)
-└── Config (Read/Write)
+```mermaid
+graph TD
+    A["SmartFall BLE Service<br/>UUID: 4fafc201-1fb5-459e-8fcc-c5c9c331914b"]
+
+    B["Emergency Alert<br/>Notify only"]
+    C["Sensor Data<br/>Notify only"]
+    D["Status<br/>Read + Notify"]
+    E["Command<br/>Write only"]
+    F["Config<br/>Read + Write"]
+
+    A --> B
+    A --> C
+    A --> D
+    A --> E
+    A --> F
+
+    style A fill:#2563eb,color:#fff
+    style B fill:#dc2626,color:#fff
+    style C fill:#3b82f6,color:#fff
+    style D fill:#8b5cf6,color:#fff
+    style E fill:#f97316,color:#fff
+    style F fill:#d946ef,color:#fff
 ```
 
 ### SmartFallBLEServer Class
@@ -367,25 +381,52 @@ if (status == EmergencyComms::TRANSMISSION_SUCCESS) {
 
 ## Dual-Protocol Alert Flow
 
-```
-Emergency Event Triggered
-    │
-    ├─→ [WiFi Path]
-    │   ├─→ WiFi_Manager::sendEmergency()
-    │   ├─→ HTTP POST to /api/emergency
-    │   ├─→ Retry up to 3 times (5s intervals)
-    │   └─→ Status: Success or Failed
-    │
-    └─→ [BLE Path]
-        ├─→ BLE_Server::sendEmergencyAlert()
-        ├─→ Notify Emergency Characteristic
-        ├─→ Mobile app receives notification
-        └─→ Status: Success (if connected) or Queued
+```mermaid
+graph TD
+    A["Emergency Event<br/>Triggered"]
 
-    Final State:
-    ├─→ At least one channel succeeded: TRANSMITTED
-    ├─→ Both channels failed: QUEUED for retry
-    └─→ Queue retry on WiFi reconnect
+    B["WiFi Path"]
+    B1["WiFi_Manager<br/>sendEmergency()"]
+    B2["HTTP POST<br/>/api/emergency"]
+    B3["Retry up to 3x<br/>5s intervals"]
+    B4{Success?}
+    B5["Status: Success"]
+    B6["Status: Failed"]
+
+    C["BLE Path"]
+    C1["BLE_Server<br/>sendEmergencyAlert()"]
+    C2["Notify Emergency<br/>Characteristic"]
+    C3["Mobile app<br/>receives alert"]
+    C4{Connected?}
+    C5["Status: Success"]
+    C6["Status: Queued"]
+
+    D{Result}
+    E["TRANSMITTED<br/>At least one succeeded"]
+    F["QUEUED<br/>Both failed, retry on WiFi"]
+
+    A --> B
+    A --> C
+
+    B --> B1 --> B2 --> B3 --> B4
+    B4 -->|Yes| B5
+    B4 -->|No| B6
+
+    C --> C1 --> C2 --> C3 --> C4
+    C4 -->|Connected| C5
+    C4 -->|Not connected| C6
+
+    B5 --> D
+    B6 --> D
+    C5 --> D
+    C6 --> D
+
+    D -->|Min 1 success| E
+    D -->|Both failed| F
+
+    style A fill:#dc2626,color:#fff
+    style E fill:#16a34a,color:#fff
+    style F fill:#f97316,color:#fff
 ```
 
 ## Power Consumption During Communication

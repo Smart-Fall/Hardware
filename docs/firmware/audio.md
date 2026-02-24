@@ -14,14 +14,33 @@ Comprehensive guide to the SmartFall audio alert system powered by the PAM8302 a
 
 ### Wiring
 
+```mermaid
+graph LR
+    A["ESP32<br/>Feather V2"]
+    B["PAM8302<br/>Amplifier"]
+    C["Speaker<br/>8Ω"]
+
+    A -->|GPIO 25<br/>PWM 5kHz| B
+    A -->|3.3V Power| B
+    A -->|GND| B
+    B -->|OUT+| C
+    B -->|OUT-/GND| C
+
+    style A fill:#2563eb,color:#fff
+    style B fill:#f97316,color:#fff
+    style C fill:#16a34a,color:#fff
 ```
-ESP32 GPIO 25 (PWM 5kHz) ──→ PAM8302 A+ (Audio Input+)
-ESP32 GND                 ──→ PAM8302 A- (Audio Input-)
-ESP32 3.3V                ──→ PAM8302 VIN (Power)
-ESP32 GND                 ──→ PAM8302 GND (Ground)
-PAM8302 OUT+              ──→ Speaker(+)
-PAM8302 OUT-              ──→ Speaker(-)/GND
-```
+
+**Pin Connections:**
+
+| ESP32 Pin | Signal | PAM8302 Pin |
+|-----------|--------|-------------|
+| GPIO 25 | PWM Audio (5kHz) | A+ (Audio Input+) |
+| GND | Ground | A- (Audio Input-) |
+| 3.3V | Power Supply | VIN |
+| GND | Ground Return | GND |
+| — | — | OUT+ → Speaker (+) |
+| — | — | OUT- → Speaker (-/GND) |
 
 ## Audio Manager API
 

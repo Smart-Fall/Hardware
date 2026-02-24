@@ -243,42 +243,92 @@ const uint8_t SUSPICIOUS_THRESHOLD = 29;        // 30-47: SUSPICIOUS (normal)
 
 ### Immediate Action (≥76 points)
 
-```
-Confidence Score ≥ 76
-    │
-    ├─→ Play ALERT_SIREN (5 seconds)
-    ├─→ Send emergency alert (WiFi + BLE)
-    ├─→ Start 30-second countdown
-    └─→ Wait for:
-        ├─ User response (movement or button)
-        ├─ SOS button confirmation
-        └─ Countdown timeout
+```mermaid
+graph TD
+    A["Confidence Score<br/>≥ 76 points"]
+
+    B["Play ALERT_SIREN<br/>5 seconds"]
+    C["Send Emergency Alert<br/>WiFi + BLE"]
+    D["Start 30-second<br/>Countdown"]
+
+    E{User Response?}
+    E1["Movement Detected<br/>→ Cancel Alert"]
+    E2["SOS Button Pressed<br/>→ Confirm Emergency"]
+    E3["Countdown Timeout<br/>→ Contact Services"]
+
+    A --> B
+    B --> C
+    C --> D
+    D --> E
+
+    E -->|Movement| E1
+    E -->|SOS Button| E2
+    E -->|30s Passed| E3
+
+    style A fill:#dc2626,color:#fff
+    style E1 fill:#16a34a,color:#fff
+    style E2 fill:#f97316,color:#fff
+    style E3 fill:#f97316,color:#fff
 ```
 
 ### Confirmed Fall (67-75 points)
 
-```
-Confidence Score 67-75
-    │
-    ├─→ Wait 5 seconds
-    ├─→ If still HIGH:
-    │   ├─→ Play ALERT_SIREN
-    │   ├─→ Send alert
-    │   └─→ Start 30-second countdown
-    └─→ If resolved (movement detected):
-        └─→ Cancel alert
+```mermaid
+graph TD
+    A["Confidence Score<br/>67-75 points"]
+
+    B["Wait 5 seconds<br/>Monitor score"]
+
+    C{Still High?}
+
+    D["Score remains HIGH<br/>≥67"]
+    D1["Play ALERT_SIREN"]
+    D2["Send Emergency Alert"]
+    D3["Start 30-second<br/>Countdown"]
+
+    E["Score Dropped<br/>or Movement Detected"]
+    E1["Cancel Alert<br/>Resume Monitoring"]
+
+    A --> B
+    B --> C
+
+    C -->|Score ≥67| D
+    C -->|Score <67| E
+
+    D --> D1 --> D2 --> D3
+    E --> E1
+
+    style A fill:#f97316,color:#fff
+    style D fill:#dc2626,color:#fff
+    style E1 fill:#16a34a,color:#fff
 ```
 
 ### Potential Fall (48-66 points)
 
-```
-Confidence Score 48-66
-    │
-    ├─→ Enhanced monitoring (10 more seconds)
-    ├─→ Check for recovery movements
-    ├─→ Monitor HR and position
-    └─→ If score ≥67: Escalate to Confirmed
-       If resolves: Return to normal
+```mermaid
+graph TD
+    A["Confidence Score<br/>48-66 points"]
+
+    B["Enhanced Monitoring<br/>+10 seconds"]
+    C["Check for recovery<br/>movements"]
+    D["Monitor HR and<br/>position"]
+
+    E{Detection?}
+
+    F["Score ≥67<br/>Escalate"]
+    F1["Trigger Alert"]
+
+    G["Clear Recovery<br/>Signals"]
+    G1["Cancel Monitoring<br/>Return to Normal"]
+
+    A --> B --> C --> D --> E
+
+    E -->|Escalation| F --> F1
+    E -->|Recovery| G --> G1
+
+    style A fill:#f59e0b,color:#000
+    style F fill:#dc2626,color:#fff
+    style G1 fill:#16a34a,color:#fff
 ```
 
 ## Sensor History

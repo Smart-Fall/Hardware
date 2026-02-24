@@ -21,26 +21,53 @@ All I2C devices connect to the same **SDA/SCL** pins on the ESP32 Feather V2:
 
 ### Sensor Connections
 
-```
-ESP32 Feather V2           I2C Sensors
+```mermaid
+graph LR
+    ESP["ESP32 Feather V2"]
 
-GPIO 20 (SCL) ──┬────────── MPU6050 (SCL)
-                ├────────── BMP280 (SCL)
-                └────────── MAX30102 (SCL)
+    SCL["GPIO 20 (SCL)"]
+    SDA["GPIO 22 (SDA)"]
+    RST["GPIO 21 (RST)"]
+    VCC["3.3V"]
+    GND["GND"]
 
-GPIO 22 (SDA) ──┬────────── MPU6050 (SDA)
-                ├────────── BMP280 (SDA)
-                └────────── MAX30102 (SDA)
+    MPU["MPU6050<br/>0x68<br/>6-axis IMU"]
+    BMP["BMP280<br/>0x76/0x77<br/>Pressure"]
+    MAX["MAX30102<br/>0x57<br/>Heart Rate"]
 
-GPIO 21 ──────────────────── MAX30102 (RST)
+    ESP --> SCL
+    ESP --> SDA
+    ESP --> RST
+    ESP --> VCC
+    ESP --> GND
 
-3V  ────────────┬────────── MPU6050 (VDD)
-                ├────────── BMP280 (VDD)
-                └────────── MAX30102 (VDD)
+    SCL --> MPU
+    SCL --> BMP
+    SCL --> MAX
 
-GND ────────────┬────────── MPU6050 (GND)
-                ├────────── BMP280 (GND)
-                └────────── MAX30102 (GND)
+    SDA --> MPU
+    SDA --> BMP
+    SDA --> MAX
+
+    RST --> MAX
+
+    VCC --> MPU
+    VCC --> BMP
+    VCC --> MAX
+
+    GND --> MPU
+    GND --> BMP
+    GND --> MAX
+
+    style ESP fill:#2563eb,color:#fff
+    style SCL fill:#3b82f6,color:#fff
+    style SDA fill:#3b82f6,color:#fff
+    style RST fill:#8b5cf6,color:#fff
+    style VCC fill:#16a34a,color:#fff
+    style GND fill:#000,color:#fff
+    style MPU fill:#f97316,color:#fff
+    style BMP fill:#f97316,color:#fff
+    style MAX fill:#f97316,color:#fff
 ```
 
 ### Sensor Details
@@ -64,12 +91,29 @@ Only use **ADC1 pins** for analog inputs when WiFi is active:
 
 Each FSR requires proper conditioning:
 
-```
-3.3V ──────┬─────── 22kΩ Resistor ──┬──── A2/GPIO34
-           │                        │
-          [FSR]                    ├──── 0.1µF Cap to GND
-           │                        │
-          GND ─────────────────────┴──── GND
+```mermaid
+graph LR
+    VCC["3.3V"]
+    R["22kΩ<br/>Pull-up"]
+    FSR["FSR<br/>Force Sensor"]
+    C["0.1µF<br/>Cap"]
+    ADC["A2/GPIO 34<br/>ADC1 Input"]
+    GND["GND"]
+
+    VCC --> R
+    R --> ADC
+    R --> C
+
+    FSR --> ADC
+    FSR --> GND
+
+    C --> GND
+    ADC --> GND
+
+    style VCC fill:#16a34a,color:#fff
+    style FSR fill:#f97316,color:#fff
+    style ADC fill:#2563eb,color:#fff
+    style GND fill:#000,color:#fff
 ```
 
 **Component Values:**
@@ -78,16 +122,34 @@ Each FSR requires proper conditioning:
 
 ### Battery Monitor Circuit
 
+```mermaid
+graph LR
+    BAT["Battery (+)<br/>3.7-4.2V"]
+    R1["100kΩ<br/>Series"]
+    R2["47kΩ<br/>to GND"]
+    C["0.1µF<br/>Cap"]
+    ADC["A4/GPIO 36<br/>ADC1 Input"]
+    GND["GND"]
+
+    BAT --> R1
+    R1 --> ADC
+    R1 --> R2
+    R1 --> C
+
+    R2 --> GND
+    C --> GND
+    ADC --> GND
+
+    style BAT fill:#f97316,color:#fff
+    style ADC fill:#2563eb,color:#fff
+    style GND fill:#000,color:#fff
+    style R1 fill:#8b5cf6,color:#fff
+    style R2 fill:#8b5cf6,color:#fff
 ```
-Battery (+) ──┬─── 100kΩ Resistor ──┬─── A4/GPIO36
-              │                     │
-         Voltage ─────────────────┬─┤
-         Divider                  │ └─── 47kΩ Resistor ─── GND
-              │                   │
-         [50kΩ+]                  └─── 0.1µF Cap to GND
-              │
-             GND ──────────────────────── GND
-```
+
+**Voltage Divider Ratio:** (100k + 47k) / 47k = 3.128x
+- Battery 4.2V → ADC 1.34V
+- Battery 3.7V → ADC 1.18V
 
 !!! tip "Battery Voltage Formula"
     Actual battery voltage = ADC_reading × (6.6 / 4095)

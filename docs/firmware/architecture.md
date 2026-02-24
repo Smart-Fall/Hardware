@@ -192,36 +192,52 @@ bool isAvailable();       // Check if responding
 ### Fall Detection Pipeline
 
 **Flow:**
-```
-Raw Sensor Data
-    ↓
-┌─────────────────────────────┐
-│     Fall_Detector           │
-│  • 5-stage analysis         │
-│  • Timing validation        │
-│  • History tracking         │
-└─────────┬───────────────────┘
-          ↓
-┌─────────────────────────────┐
-│  Confidence_Scorer          │
-│  • Calculate points         │
-│  • Apply thresholds         │
-│  • Return FallStatus_t      │
-└─────────┬───────────────────┘
-          ↓
-      FallStatus_t
+```mermaid
+graph TD
+    A["Raw Sensor Data<br/>(Accel, Gyro, Pressure, HR)"]
+
+    B["Fall_Detector<br/>• 5-stage analysis<br/>• Timing validation<br/>• History tracking"]
+
+    C["Confidence_Scorer<br/>• Calculate points<br/>• Apply thresholds<br/>• Return FallStatus_t"]
+
+    D["FallStatus_t Result<br/>(0-5 enum value)"]
+
+    A --> B
+    B --> C
+    C --> D
+
+    style A fill:#3b82f6,color:#fff
+    style B fill:#8b5cf6,color:#fff
+    style C fill:#d946ef,color:#fff
+    style D fill:#dc2626,color:#fff
 ```
 
 ### Communication System
 
 **Architecture:**
-```
-Emergency Alert
-    ├─→ WiFi_Manager
-    │   └─→ HTTP POST /api/emergency
-    │
-    └─→ BLE_Server
-        └─→ Notify Emergency characteristic
+```mermaid
+graph TD
+    A["Emergency Alert<br/>Triggered"]
+
+    B["WiFi_Manager<br/>sendEmergency()"]
+    B1["HTTP POST<br/>/api/emergency"]
+
+    C["BLE_Server<br/>sendEmergencyAlert()"]
+    C1["Notify Emergency<br/>Characteristic"]
+
+    D["Alert Transmitted<br/>WiFi + BLE"]
+
+    A --> B
+    A --> C
+    B --> B1
+    C --> C1
+    B1 --> D
+    C1 --> D
+
+    style A fill:#dc2626,color:#fff
+    style B fill:#f97316,color:#fff
+    style C fill:#f97316,color:#fff
+    style D fill:#16a34a,color:#fff
 ```
 
 **Features:**
