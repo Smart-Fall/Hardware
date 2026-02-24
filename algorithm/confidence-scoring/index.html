@@ -50,11 +50,11 @@
 </code></pre></div> <h2 id=alert-decision-matrix>Alert Decision Matrix<a class=headerlink href=#alert-decision-matrix title="Permanent link">&para;</a></h2> <pre class=mermaid><code>graph TD
     A["Confidence Score Calculated"] --&gt; B{Score Range?}
 
-    B --&gt;|≥ 76| C["🔴 HIGH CONFIDENCE FALL"]
-    B --&gt;|67-75| D["🟠 CONFIRMED FALL"]
-    B --&gt;|48-66| E["🟡 POTENTIAL FALL"]
-    B --&gt;|30-47| F["🔵 SUSPICIOUS ACTIVITY"]
-    B --&gt;|&amp;lt; 30| G["⚪ NO FALL DETECTED"]
+    B --&gt;|≥ 76| C["[HIGH CONFIDENCE]&lt;br/&gt;FALL"]
+    B --&gt;|67-75| D["[CONFIRMED]&lt;br/&gt;FALL"]
+    B --&gt;|48-66| E["[POTENTIAL]&lt;br/&gt;FALL"]
+    B --&gt;|30-47| F["[SUSPICIOUS]&lt;br/&gt;ACTIVITY"]
+    B --&gt;|&amp;lt; 30| G["[CLEAR]&lt;br/&gt;NO FALL DETECTED"]
 
     C --&gt; C1["✓ Immediate alert&lt;br/&gt;✓ Play siren&lt;br/&gt;✓ Notify emergency&lt;br/&gt;✓ 30s countdown"]
     C1 --&gt; C2{User Response?}
@@ -62,7 +62,7 @@
     C2 --&gt;|SOS button| C4["Confirm emergency"]
     C2 --&gt;|No response| C5["Contact services"]
 
-    D --&gt; D1["⏱ 5-second delay&lt;br/&gt;Monitor score"]
+    D --&gt; D1["→ 5-second delay&lt;br/&gt;Monitor score"]
     D1 --&gt; D2{Score remains high?}
     D2 --&gt;|≥67| D3["Trigger alert"]
     D2 --&gt;|&amp;lt;67 or movement| D4["Cancel, resume monitoring"]
@@ -94,7 +94,7 @@
     F --&gt; G
 
     G --&gt; H{New Score &lt; 30?}
-    H --&gt;|Yes| I["✓ NO_FALL_DETECTED&lt;br/&gt;Resume baseline"]
+    H --&gt;|Yes| I["[OK] NO_FALL_DETECTED&lt;br/&gt;Resume baseline"]
     H --&gt;|No| J["Continue monitoring"]
 
     style A fill:#4ade80,color:#000
@@ -112,7 +112,7 @@
     F --&gt; G
 
     G --&gt; H{Score ≥ 67?}
-    H --&gt;|Yes| I["✓ CONFIRMED_FALL&lt;br/&gt;Trigger 5s delay alert"]
+    H --&gt;|Yes| I["[ALERT] CONFIRMED_FALL&lt;br/&gt;Trigger 5s delay alert"]
     H --&gt;|No| J["Continue enhanced&lt;br/&gt;monitoring"]
 
     style A fill:#ef4444,color:#fff

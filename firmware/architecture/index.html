@@ -68,22 +68,22 @@
     E2 --&gt; D
     F3 --&gt; E1
     F3 --&gt; E2</code></pre> <h2 id=main-loop-flow>Main Loop Flow<a class=headerlink href=#main-loop-flow title="Permanent link">&para;</a></h2> <p>The <code>SmartFall.ino</code> main sketch follows this execution pattern:</p> <pre class=mermaid><code>graph TD
-    A["🚀 System Startup"]
+    A["System Startup"]
     A1["✓ Initialize sensors&lt;br/&gt;✓ Configure GPIO pins&lt;br/&gt;✓ Start WiFi/BLE&lt;br/&gt;✓ Print startup banner"]
     A --&gt; A1
 
-    A1 --&gt; B["⚙️ Main Loop&lt;br/&gt;10ms / 100Hz"]
+    A1 --&gt; B["Main Loop&lt;br/&gt;10ms / 100Hz"]
 
-    B --&gt; B1["1️⃣ Read all&lt;br/&gt;sensor data"]
-    B1 --&gt; B2["2️⃣ Pass to&lt;br/&gt;Fall_Detector"]
-    B2 --&gt; B3["3️⃣ Check SOS&lt;br/&gt;button"]
-    B3 --&gt; B4["4️⃣ Process&lt;br/&gt;emergency alert"]
-    B4 --&gt; B5["5️⃣ Update WiFi/&lt;br/&gt;BLE status"]
-    B5 --&gt; B6["6️⃣ Transmit alert&lt;br/&gt;if needed"]
-    B6 --&gt; B7["7️⃣ Update UI&lt;br/&gt;LED/audio"]
-    B7 --&gt; B8["8️⃣ Sleep for&lt;br/&gt;remaining time"]
+    B --&gt; B1["(1) Read all&lt;br/&gt;sensor data"]
+    B1 --&gt; B2["(2) Pass to&lt;br/&gt;Fall_Detector"]
+    B2 --&gt; B3["(3) Check SOS&lt;br/&gt;button"]
+    B3 --&gt; B4["(4) Process&lt;br/&gt;emergency alert"]
+    B4 --&gt; B5["(5) Update WiFi/&lt;br/&gt;BLE status"]
+    B5 --&gt; B6["(6) Transmit alert&lt;br/&gt;if needed"]
+    B6 --&gt; B7["(7) Update UI&lt;br/&gt;LED/audio"]
+    B7 --&gt; B8["(8) Sleep for&lt;br/&gt;remaining time"]
 
-    B8 --&gt; C["⏱️ Loop every 10ms"]
+    B8 --&gt; C["Loop every 10ms"]
     C --&gt;|Continue| B
 
     style A fill:#4ade80,color:#000
