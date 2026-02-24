@@ -79,44 +79,54 @@ graph TD
 
 A fall event follows a predictable physical sequence:
 
+```mermaid
+timeline
+    title Real Fall Timeline - Temporal Sequence
+    T0 : Initial loss of balance
+    T1 : Free fall begins<br/>Acceleration &lt;0.5g
+    T2 : User rotates uncontrollably<br/>High angular velocity
+    T3 : Impact with ground<br/>Acceleration &gt;3g
+    T4 : User remains incapacitated<br/>Acceleration 0.8-1.2g<br/>No movement
 ```
-Real Fall Timeline:
-├─ T0:    Initial loss of balance
-├─ T1:    Free fall begins (acceleration <0.5g)
-├─ T2:    User rotates uncontrollably
-├─ T3:    Impact with ground (acceleration >3g)
-└─ T4:    User remains incapacitated
-            (acceleration 0.8-1.2g, no movement)
 
-Each stage confirms the previous:
-  No Stage 1 → Not a fall
-  No Stage 2 after Stage 1 → Not a fall
-  No Stage 3-4 → Possible false positive
-```
+Each stage **confirms the previous** one:
+- No Stage 1 detected → **Not a fall**
+- No Stage 2 after Stage 1 → **Not a fall**
+- No Stage 3-4 sequence → **Possible false positive**
 
 ### Stage Interdependencies
 
+```mermaid
+graph TD
+    S1["Stage 1: Free Fall<br/>Acceleration &lt;0.5g"]
+    S2["Stage 2: Impact<br/>Acceleration &gt;3g"]
+    S3["Stage 3: Rotation<br/>Angular velocity &gt;150°/s"]
+    S4["Stage 4: Inactivity<br/>0.8-1.2g for 2+ sec"]
+    S5["Stage 5: Filters<br/>BMP280, HR, FSR"]
+
+    S1 -->|Required for| S2
+    S1 -->|False positive filter| S1
+    S2 -->|Confirms| S1
+    S2 -->|Timing-dependent on| S1
+    S3 -->|Validates motion| S2
+    S3 -->|Rules out self-caught| S3
+    S4 -->|Confirms incapacity| S3
+    S4 -->|Discriminates recovery| S4
+    S5 -->|Final validation| S4
+
+    style S1 fill:#ff6b6b,color:#fff
+    style S2 fill:#ff8c42,color:#fff
+    style S3 fill:#ffd93d,color:#000
+    style S4 fill:#6bcf7f,color:#fff
+    style S5 fill:#4d96ff,color:#fff
 ```
-Stage 1 (Free Fall)
-    ├─→ Required for Stages 2-4
-    └─→ Independent false positive filter
 
-Stage 2 (Impact)
-    ├─→ Confirms stage 1 (validates free fall)
-    └─→ Timing-dependent on stage 1
-
-Stage 3 (Rotation)
-    ├─→ Validates uncontrolled motion
-    └─→ Rules out self-caught falls
-
-Stage 4 (Inactivity)
-    ├─→ Confirms user incapacity
-    └─→ Discriminates from falls where user stands up
-
-Stage 5 (Filters)
-    ├─→ Final validation using secondary sensors
-    └─→ Reduces false positives without delaying true falls
-```
+**How Stages Work Together:**
+- **Stage 1** is the entry point - without free fall detection, no fall is detected
+- **Stage 2** validates Stage 1 by detecting impact after the free fall
+- **Stage 3** confirms uncontrolled motion (not a controlled catch)
+- **Stage 4** verifies the user cannot immediately recover
+- **Stage 5** uses secondary sensors to reduce false positives
 
 ## Confidence Scoring System
 

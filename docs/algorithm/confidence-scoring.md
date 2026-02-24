@@ -103,99 +103,73 @@ enum FallStatus_t {
 
 ## Alert Decision Matrix
 
-### Threshold: HIGH_CONFIDENCE_FALL (≥76 points)
+```mermaid
+graph TD
+    A["Confidence Score Calculated"] --> B{Score Range?}
 
-```
-Confidence Score ≥ 76
-    │
-    ├─→ IMMEDIATE Alert (no delay)
-    ├─→ Play ALERT_SIREN (5 seconds)
-    ├─→ Send emergency notification (WiFi + BLE)
-    ├─→ Start 30-second user response countdown
-    └─→ User can:
-        ├─ Respond (movement) → Cancel alert
-        ├─ Press SOS button → Confirm emergency
-        └─ No response → Contact emergency services
-```
+    B -->|≥ 76| C["🔴 HIGH CONFIDENCE FALL"]
+    B -->|67-75| D["🟠 CONFIRMED FALL"]
+    B -->|48-66| E["🟡 POTENTIAL FALL"]
+    B -->|30-47| F["🔵 SUSPICIOUS ACTIVITY"]
+    B -->|&lt; 30| G["⚪ NO FALL DETECTED"]
 
-**Rationale**: 76+ points indicates a highly confident fall. Delay would endanger the user.
+    C --> C1["✓ Immediate alert<br/>✓ Play siren<br/>✓ Notify emergency<br/>✓ 30s countdown"]
+    C1 --> C2{User Response?}
+    C2 -->|Moves| C3["Cancel alert"]
+    C2 -->|SOS button| C4["Confirm emergency"]
+    C2 -->|No response| C5["Contact services"]
 
-### Threshold: CONFIRMED_FALL (67-75 points)
+    D --> D1["⏱ 5-second delay<br/>Monitor score"]
+    D1 --> D2{Score remains high?}
+    D2 -->|≥67| D3["Trigger alert"]
+    D2 -->|&lt;67 or movement| D4["Cancel, resume monitoring"]
 
-```
-Confidence Score 67-75
-    │
-    ├─→ DELAYED Alert (5-second wait)
-    ├─→ Monitor for additional indicators
-    ├─→ If score remains ≥67:
-    │   ├─→ Play ALERT_SIREN
-    │   ├─→ Send emergency notification
-    │   └─→ Start 30-second countdown
-    └─→ If score drops OR user moves:
-        └─→ Cancel alert, resume monitoring
-```
+    E --> E1["📊 Enhanced monitoring<br/>+10 second window"]
+    E1 --> E2{Escalation<br/>or recovery?}
+    E2 -->|Escalate| E3["Score ≥67<br/>→ Confirmed Fall"]
+    E2 -->|Recover| E4["-30 points<br/>→ No Fall"]
 
-**Rationale**: At this borderline score, 5 seconds allows the person to move if they're OK, preventing false alarms from quick recoveries.
+    F --> F1["Continue monitoring<br/>Increased sensitivity"]
 
-### Threshold: POTENTIAL_FALL (48-66 points)
+    G --> G1["Reset detection<br/>Return to baseline"]
 
-```
-Confidence Score 48-66
-    │
-    ├─→ NO immediate alert
-    ├─→ ENHANCED MONITORING MODE
-    │   ├─→ Extend detection window by 10 seconds
-    │   ├─→ Monitor for recovery indicators:
-    │   │   ├─ Coordinated movement patterns
-    │   │   ├─ Return to upright position
-    │   │   └─ Normal walking resumption
-    │   │
-    │   └─→ Monitor for escalation indicators:
-    │       ├─ Continued inactivity (add 8 pts)
-    │       ├─ Heart rate elevation (add 5 pts)
-    │       └─ No recovery movement (stays high)
-    │
-    ├─→ If score increases to ≥67:
-    │   └─→ Escalate to CONFIRMED_FALL alert
-    │
-    └─→ If clear recovery detected:
-        ├─→ Subtract 30 points
-        └─→ Return to normal monitoring
+    style C fill:#ff4444,color:#fff
+    style D fill:#ff9944,color:#000
+    style E fill:#ffdd44,color:#000
+    style F fill:#4444ff,color:#fff
+    style G fill:#cccccc,color:#000
 ```
 
-**Rationale**: This score range suggests a possible fall, but some people recover quickly. Extended monitoring with escalation logic prevents false alarms while catching genuine emergencies.
+### Detailed Thresholds
 
-### Threshold: SUSPICIOUS_ACTIVITY (30-47 points)
+**HIGH_CONFIDENCE_FALL (≥76 points)**
+- **Action**: IMMEDIATE alert (no delay)
+- **Rationale**: 76+ points indicates a highly confident fall. Delay would endanger the user.
+- **Response Options**:
+  - User moves significantly → Cancel alert
+  - SOS button pressed → Confirm emergency
+  - No response (30s) → Contact emergency services
 
-```
-Confidence Score 30-47
-    │
-    ├─→ NO alert
-    ├─→ NORMAL MONITORING with increased sensitivity
-    │   ├─→ Continue 5-stage detection pipeline
-    │   ├─→ Note: This person may be at risk
-    │   └─→ If additional motion detected → Recalculate
-    │
-    └─→ Possible causes:
-        ├─ Person getting up from chair (high acceleration)
-        ├─ Device drop caught in hand (quick deceleration)
-        ├─ Vigorous exercise (high rotation)
-        └─ Outdoor activity on uneven terrain
-```
+**CONFIRMED_FALL (67-75 points)**
+- **Action**: DELAYED alert (5-second wait)
+- **Rationale**: At this borderline score, 5 seconds allows the person to move if they're OK, preventing false alarms.
+- **Monitoring**: Check if score remains ≥67 or if user moves
 
-**Rationale**: While some criteria are met, the score is too low for action. Continue normal monitoring to allow systems to settle.
+**POTENTIAL_FALL (48-66 points)**
+- **Action**: Enhanced monitoring mode (10 more seconds)
+- **Rationale**: Score suggests possible fall, but recovery is likely. Extended monitoring with escalation logic.
+- **Can escalate to**: CONFIRMED_FALL if inactivity continues
+- **Can downgrade to**: NO_FALL if clear recovery detected
 
-### Threshold: NO_FALL_DETECTED (<30 points)
+**SUSPICIOUS_ACTIVITY (30-47 points)**
+- **Action**: Continue normal monitoring with increased sensitivity
+- **Rationale**: Some criteria met, but score too low for alert
+- **Possible causes**: Exercise, quick recovery, false trigger
+- **Next step**: Recalculate if additional motion detected
 
-```
-Confidence Score < 30
-    │
-    ├─→ NO alert
-    ├─→ RESET detection state
-    └─→ Return to baseline monitoring
-```
-
-**Rationale**: Either sensors haven't detected events yet, or the pattern doesn't match fall characteristics.
+**NO_FALL_DETECTED (<30 points)**
+- **Action**: Reset detection state, return to baseline monitoring
+- **Rationale**: Sensors haven't detected fall pattern
 
 ## Enhanced Monitoring Decision Logic
 
@@ -203,52 +177,59 @@ When confidence is POTENTIAL_FALL (48-66), SmartFall enters enhanced monitoring:
 
 ### Recovery Signals (Downgrade)
 
-If any of these occur, subtract 30 points:
+If any of these occur, **subtract 30 points**:
 
-```
-Recovery Signals:
-├─ Clear coordinated movement pattern
-│  └─ Sequential motion: Roll → Sit → Stand
-│  └─ Time frame: < 5 seconds post-fall
-│
-├─ Person achieves upright position
-│  └─ Acceleration pattern changes from 0.8-1.2g to 1.0-1.3g
-│  └─ Vertical axis acceleration increases
-│
-├─ Normal walking pattern detected
-│  └─ Regular stride cadence (100-120 steps/min)
-│  └─ Smooth acceleration/deceleration
-│
-└─ User responds to audio prompt
-   └─ Movement detected within 10 seconds of prompt
+```mermaid
+graph LR
+    A["Recovery Signal<br/>Detected"] --> B{"Signal Type?"}
+
+    B -->|Coordinated Movement| C["Roll → Sit → Stand<br/>within 5 seconds"]
+    B -->|Achieves Upright| D["Acceleration pattern<br/>changes to upright"]
+    B -->|Walking Pattern| E["Regular stride<br/>100-120 steps/min"]
+    B -->|Audio Response| F["Movement within<br/>10 seconds of prompt"]
+
+    C --> G["−30 Points<br/>Score Drops"]
+    D --> G
+    E --> G
+    F --> G
+
+    G --> H{New Score < 30?}
+    H -->|Yes| I["✓ NO_FALL_DETECTED<br/>Resume baseline"]
+    H -->|No| J["Continue monitoring"]
+
+    style A fill:#4ade80,color:#000
+    style I fill:#cccccc,color:#000
 ```
 
-**Result**: If downgraded, confidence < 30 → NO_FALL_DETECTED, resume normal monitoring
+**Result**: Confidence drops below 30 → NO_FALL_DETECTED, resume normal monitoring
 
 ### Escalation Signals (Upgrade)
 
-Add points for these indicators:
+If any of these occur, **add points**:
 
-```
-Escalation Signals:
-├─ Continued inactivity
-│  └─ No movement for 5+ seconds post-impact
-│  └─ Add 8 points
-│
-├─ Elevated heart rate sustained
-│  └─ HR remains >30 BPM above baseline
-│  └─ Add 5 points
-│
-├─ Device orientation suggests lying down
-│  └─ Sustained 0.9-1.1g on non-gravity axis
-│  └─ Add 3 points
-│
-└─ No response to gentle audio prompts
-   └─ Audio notification played, but no movement
-   └─ Add 5 points
+```mermaid
+graph LR
+    A["Escalation Signal<br/>Detected"] --> B{"Signal Type?"}
+
+    B -->|Continued Inactivity| C["+8 points<br/>No movement 5+ sec<br/>after impact"]
+    B -->|Elevated Heart Rate| D["+5 points<br/>HR remains 30+ BPM<br/>above baseline"]
+    B -->|Device Orientation| E["+3 points<br/>Sustained 0.9-1.1g<br/>on non-gravity axis"]
+    B -->|No Audio Response| F["+5 points<br/>No movement after<br/>audio prompt"]
+
+    C --> G["Update Score"]
+    D --> G
+    E --> G
+    F --> G
+
+    G --> H{Score ≥ 67?}
+    H -->|Yes| I["✓ CONFIRMED_FALL<br/>Trigger 5s delay alert"]
+    H -->|No| J["Continue enhanced<br/>monitoring"]
+
+    style A fill:#ef4444,color:#fff
+    style I fill:#ff9944,color:#000
 ```
 
-**Result**: If upgraded to ≥67 → CONFIRMED_FALL, trigger alert with 5-second delay
+**Result**: Score reaches ≥67 → CONFIRMED_FALL, trigger alert with 5-second delay
 
 ## SOS Button Override
 

@@ -183,27 +183,22 @@ Heat dissipation: ~10% of input power
 
 ## Runtime Capacity Chart
 
+```mermaid
+xychart-beta
+    title Battery Capacity vs Operating Time (at 95mA average)
+    x-axis [40, 50, 60, 70, 80, 90] hours
+    y-axis "Battery Capacity" 1000 --> 5000 mAh
+    line [1000, 2000, 3000, 4000, 5000, 5000]
+    line [1000, 2000, 3000, 4000, 4500, 4000]
+    line [1000, 2000, 3000, 3500, 3000, 2000]
 ```
-Battery Capacity vs Operating Time
 
-5000 mAh ┤
-         │     ****
-         │    *    *
-         │   *      *
-4000 mAh ┤  *        *****
-         │ *
-3000 mAh ┤*                ***
-         │
-2000 mAh ┤                       ****
-         │
-1000 mAh ┤                               ****
-         │
-         └────────────────────────────────────
-          40    50    60    70    80    90
-          ↑     ↑     ↑     ↑     ↑     ↑
-         42h   52h   62h   72h   82h   92h
-         (95mA) (normal operation baseline)
-```
+**Operating Time at 95mA (Normal Operation)**:
+- **1000 mAh**: ~10 hours
+- **2000 mAh**: ~21 hours
+- **3000 mAh**: ~32 hours
+- **4000 mAh**: ~42 hours
+- **5000 mAh**: ~53 hours
 
 ## Power Management Configuration
 

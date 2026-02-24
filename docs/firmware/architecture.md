@@ -86,30 +86,29 @@ graph TD
 
 The `SmartFall.ino` main sketch follows this execution pattern:
 
-```
-┌─────────────────────────────────────┐
-│         System Startup              │
-│  - Initialize sensors               │
-│  - Configure GPIO pins              │
-│  - Start WiFi/BLE                   │
-│  - Print startup banner             │
-└────────────┬────────────────────────┘
-             │
-             ↓
-┌─────────────────────────────────────┐
-│      Main Loop (10ms, 100Hz)        │
-├─────────────────────────────────────┤
-│  1. Read all sensor data            │
-│  2. Pass to Fall_Detector           │
-│  3. Check SOS button                │
-│  4. Process emergency alert         │
-│  5. Update WiFi/BLE status          │
-│  6. Transmit alert if needed        │
-│  7. Update UI (LED/audio)           │
-│  8. Sleep for remaining time        │
-└────────────┬────────────────────────┘
-             │
-             └─── Loop every 10ms ───┘
+```mermaid
+graph TD
+    A["🚀 System Startup"]
+    A1["✓ Initialize sensors<br/>✓ Configure GPIO pins<br/>✓ Start WiFi/BLE<br/>✓ Print startup banner"]
+    A --> A1
+
+    A1 --> B["⚙️ Main Loop<br/>10ms / 100Hz"]
+
+    B --> B1["1️⃣ Read all<br/>sensor data"]
+    B1 --> B2["2️⃣ Pass to<br/>Fall_Detector"]
+    B2 --> B3["3️⃣ Check SOS<br/>button"]
+    B3 --> B4["4️⃣ Process<br/>emergency alert"]
+    B4 --> B5["5️⃣ Update WiFi/<br/>BLE status"]
+    B5 --> B6["6️⃣ Transmit alert<br/>if needed"]
+    B6 --> B7["7️⃣ Update UI<br/>LED/audio"]
+    B7 --> B8["8️⃣ Sleep for<br/>remaining time"]
+
+    B8 --> C["⏱️ Loop every 10ms"]
+    C -->|Continue| B
+
+    style A fill:#4ade80,color:#000
+    style B fill:#60a5fa,color:#fff
+    style C fill:#f97316,color:#fff
 ```
 
 ## Core Data Structures
