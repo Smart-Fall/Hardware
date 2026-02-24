@@ -28,79 +28,75 @@
 
     T --&gt; U["30-Second User&lt;br/&gt;Response Window"]
 
-    D --&gt; R</code></pre> <h2 id=timing-architecture>Timing Architecture<a class=headerlink href=#timing-architecture title="Permanent link">&para;</a></h2> <h3 id=sensor-data-acquisition>Sensor Data Acquisition<a class=headerlink href=#sensor-data-acquisition title="Permanent link">&para;</a></h3> <ul> <li><strong>Frequency</strong>: 100 Hz (10ms intervals)</li> <li><strong>Latency</strong>: &lt;5ms from sensor reading to algorithm processing</li> <li><strong>Resolution</strong>: Sufficient to capture fall dynamics</li> </ul> <h3 id=detection-window>Detection Window<a class=headerlink href=#detection-window title="Permanent link">&para;</a></h3> <ul> <li><strong>Primary</strong>: 10 seconds of active analysis</li> <li><strong>Extended</strong>: Additional 10 seconds in enhanced monitoring</li> <li><strong>History Buffer</strong>: Maintains last 100 samples (~1 second)</li> </ul> <h3 id=alert-response>Alert Response<a class=headerlink href=#alert-response title="Permanent link">&para;</a></h3> <ul> <li><strong>Detection to First Alert</strong>: &lt;2 seconds</li> <li><strong>Alert Duration</strong>: 5 seconds siren + 25 seconds wait</li> <li><strong>Total Response Window</strong>: 30 seconds</li> </ul> <h2 id=multi-stage-architecture>Multi-Stage Architecture<a class=headerlink href=#multi-stage-architecture title="Permanent link">&para;</a></h2> <h3 id=why-5-stages>Why 5 Stages?<a class=headerlink href=#why-5-stages title="Permanent link">&para;</a></h3> <p>A fall event follows a predictable physical sequence:</p> <div class=highlight><pre><span></span><code><a id=__codelineno-0-1 name=__codelineno-0-1 href=#__codelineno-0-1></a>Real Fall Timeline:
-<a id=__codelineno-0-2 name=__codelineno-0-2 href=#__codelineno-0-2></a>├─ T0:    Initial loss of balance
-<a id=__codelineno-0-3 name=__codelineno-0-3 href=#__codelineno-0-3></a>├─ T1:    Free fall begins (acceleration &lt;0.5g)
-<a id=__codelineno-0-4 name=__codelineno-0-4 href=#__codelineno-0-4></a>├─ T2:    User rotates uncontrollably
-<a id=__codelineno-0-5 name=__codelineno-0-5 href=#__codelineno-0-5></a>├─ T3:    Impact with ground (acceleration &gt;3g)
-<a id=__codelineno-0-6 name=__codelineno-0-6 href=#__codelineno-0-6></a>└─ T4:    User remains incapacitated
-<a id=__codelineno-0-7 name=__codelineno-0-7 href=#__codelineno-0-7></a>            (acceleration 0.8-1.2g, no movement)
-<a id=__codelineno-0-8 name=__codelineno-0-8 href=#__codelineno-0-8></a>
-<a id=__codelineno-0-9 name=__codelineno-0-9 href=#__codelineno-0-9></a>Each stage confirms the previous:
-<a id=__codelineno-0-10 name=__codelineno-0-10 href=#__codelineno-0-10></a>  No Stage 1 → Not a fall
-<a id=__codelineno-0-11 name=__codelineno-0-11 href=#__codelineno-0-11></a>  No Stage 2 after Stage 1 → Not a fall
-<a id=__codelineno-0-12 name=__codelineno-0-12 href=#__codelineno-0-12></a>  No Stage 3-4 → Possible false positive
-</code></pre></div> <h3 id=stage-interdependencies>Stage Interdependencies<a class=headerlink href=#stage-interdependencies title="Permanent link">&para;</a></h3> <div class=highlight><pre><span></span><code><a id=__codelineno-1-1 name=__codelineno-1-1 href=#__codelineno-1-1></a>Stage 1 (Free Fall)
-<a id=__codelineno-1-2 name=__codelineno-1-2 href=#__codelineno-1-2></a>    ├─→ Required for Stages 2-4
-<a id=__codelineno-1-3 name=__codelineno-1-3 href=#__codelineno-1-3></a>    └─→ Independent false positive filter
-<a id=__codelineno-1-4 name=__codelineno-1-4 href=#__codelineno-1-4></a>
-<a id=__codelineno-1-5 name=__codelineno-1-5 href=#__codelineno-1-5></a>Stage 2 (Impact)
-<a id=__codelineno-1-6 name=__codelineno-1-6 href=#__codelineno-1-6></a>    ├─→ Confirms stage 1 (validates free fall)
-<a id=__codelineno-1-7 name=__codelineno-1-7 href=#__codelineno-1-7></a>    └─→ Timing-dependent on stage 1
-<a id=__codelineno-1-8 name=__codelineno-1-8 href=#__codelineno-1-8></a>
-<a id=__codelineno-1-9 name=__codelineno-1-9 href=#__codelineno-1-9></a>Stage 3 (Rotation)
-<a id=__codelineno-1-10 name=__codelineno-1-10 href=#__codelineno-1-10></a>    ├─→ Validates uncontrolled motion
-<a id=__codelineno-1-11 name=__codelineno-1-11 href=#__codelineno-1-11></a>    └─→ Rules out self-caught falls
-<a id=__codelineno-1-12 name=__codelineno-1-12 href=#__codelineno-1-12></a>
-<a id=__codelineno-1-13 name=__codelineno-1-13 href=#__codelineno-1-13></a>Stage 4 (Inactivity)
-<a id=__codelineno-1-14 name=__codelineno-1-14 href=#__codelineno-1-14></a>    ├─→ Confirms user incapacity
-<a id=__codelineno-1-15 name=__codelineno-1-15 href=#__codelineno-1-15></a>    └─→ Discriminates from falls where user stands up
-<a id=__codelineno-1-16 name=__codelineno-1-16 href=#__codelineno-1-16></a>
-<a id=__codelineno-1-17 name=__codelineno-1-17 href=#__codelineno-1-17></a>Stage 5 (Filters)
-<a id=__codelineno-1-18 name=__codelineno-1-18 href=#__codelineno-1-18></a>    ├─→ Final validation using secondary sensors
-<a id=__codelineno-1-19 name=__codelineno-1-19 href=#__codelineno-1-19></a>    └─→ Reduces false positives without delaying true falls
-</code></pre></div> <h2 id=confidence-scoring-system>Confidence Scoring System<a class=headerlink href=#confidence-scoring-system title="Permanent link">&para;</a></h2> <p>Instead of binary yes/no decisions, SmartFall accumulates <strong>confidence points</strong> (0-105 total):</p> <h3 id=maximum-points-per-stage>Maximum Points per Stage<a class=headerlink href=#maximum-points-per-stage title="Permanent link">&para;</a></h3> <table> <thead> <tr> <th>Stage</th> <th>Max Points</th> <th>Focus</th> </tr> </thead> <tbody> <tr> <td><strong>Stage 1</strong></td> <td>25 pts</td> <td>Free fall detection</td> </tr> <tr> <td><strong>Stage 2</strong></td> <td>25 pts</td> <td>Impact confirmation</td> </tr> <tr> <td><strong>Stage 3</strong></td> <td>20 pts</td> <td>Rotation validation</td> </tr> <tr> <td><strong>Stage 4</strong></td> <td>20 pts</td> <td>Incapacity duration</td> </tr> <tr> <td><strong>Stage 5</strong></td> <td>15 pts</td> <td>False positive filtering</td> </tr> <tr> <td><strong>TOTAL</strong></td> <td><strong>105 pts</strong></td> <td>Comprehensive score</td> </tr> </tbody> </table> <h3 id=scoring-formula>Scoring Formula<a class=headerlink href=#scoring-formula title="Permanent link">&para;</a></h3> <div class=highlight><pre><span></span><code><a id=__codelineno-2-1 name=__codelineno-2-1 href=#__codelineno-2-1></a>Total Confidence = Σ(Stage Points) + Σ(Filter Points)
-<a id=__codelineno-2-2 name=__codelineno-2-2 href=#__codelineno-2-2></a>
-<a id=__codelineno-2-3 name=__codelineno-2-3 href=#__codelineno-2-3></a>Then classify:
-<a id=__codelineno-2-4 name=__codelineno-2-4 href=#__codelineno-2-4></a>├─ ≥76 pts:  HIGH CONFIDENCE → Immediate alert
-<a id=__codelineno-2-5 name=__codelineno-2-5 href=#__codelineno-2-5></a>├─ 67-75 pts: CONFIRMED → 5-second delay
-<a id=__codelineno-2-6 name=__codelineno-2-6 href=#__codelineno-2-6></a>├─ 48-66 pts: POTENTIAL → Monitor 10 more seconds
-<a id=__codelineno-2-7 name=__codelineno-2-7 href=#__codelineno-2-7></a>├─ 30-47 pts: SUSPICIOUS → Continue normal monitoring
-<a id=__codelineno-2-8 name=__codelineno-2-8 href=#__codelineno-2-8></a>└─ &lt;30 pts:   NO FALL → Reset
-</code></pre></div> <h2 id=decision-logic-thresholds>Decision Logic Thresholds<a class=headerlink href=#decision-logic-thresholds title="Permanent link">&para;</a></h2> <div class=highlight><pre><span></span><code><a id=__codelineno-3-1 name=__codelineno-3-1 href=#__codelineno-3-1></a>Confidence Points
-<a id=__codelineno-3-2 name=__codelineno-3-2 href=#__codelineno-3-2></a>     105 ┤
-<a id=__codelineno-3-3 name=__codelineno-3-3 href=#__codelineno-3-3></a>         │                                   ╱ HIGH CONFIDENCE
-<a id=__codelineno-3-4 name=__codelineno-3-4 href=#__codelineno-3-4></a>         │                                ╱│ Immediate alert
-<a id=__codelineno-3-5 name=__codelineno-3-5 href=#__codelineno-3-5></a>      76 ├───────────────────────────────╱──┤
-<a id=__codelineno-3-6 name=__codelineno-3-6 href=#__codelineno-3-6></a>         │                            ╱│ CONFIRMED
-<a id=__codelineno-3-7 name=__codelineno-3-7 href=#__codelineno-3-7></a>      67 ├────────────────────────╱───┤│ 5s delay alert
-<a id=__codelineno-3-8 name=__codelineno-3-8 href=#__codelineno-3-8></a>         │                    ╱│ POTENTIAL
-<a id=__codelineno-3-9 name=__codelineno-3-9 href=#__codelineno-3-9></a>      48 ├─────────────────╱───┤│ Extended monitoring
-<a id=__codelineno-3-10 name=__codelineno-3-10 href=#__codelineno-3-10></a>         │             ╱│ SUSPICIOUS
-<a id=__codelineno-3-11 name=__codelineno-3-11 href=#__codelineno-3-11></a>      30 ├──────────╱───┤│ Normal monitoring
-<a id=__codelineno-3-12 name=__codelineno-3-12 href=#__codelineno-3-12></a>         │      ╱│ NO FALL
-<a id=__codelineno-3-13 name=__codelineno-3-13 href=#__codelineno-3-13></a>       0 └────╱──────────────────────────────
-<a id=__codelineno-3-14 name=__codelineno-3-14 href=#__codelineno-3-14></a>             Detection      Stages 1-5 Process
-</code></pre></div> <h2 id=real-world-example-backward-fall>Real-World Example: Backward Fall<a class=headerlink href=#real-world-example-backward-fall title="Permanent link">&para;</a></h2> <div class=highlight><pre><span></span><code><a id=__codelineno-4-1 name=__codelineno-4-1 href=#__codelineno-4-1></a>Event Timeline:
-<a id=__codelineno-4-2 name=__codelineno-4-2 href=#__codelineno-4-2></a>T=0ms:   Person loses balance (backward motion detected)
-<a id=__codelineno-4-3 name=__codelineno-4-3 href=#__codelineno-4-3></a>T=150ms: Free fall begins (acceleration drops to 0.2g) → Stage 1: +15 pts
-<a id=__codelineno-4-4 name=__codelineno-4-4 href=#__codelineno-4-4></a>T=400ms: Head impacts floor (8g acceleration spike) → Stage 2: +15 pts
-<a id=__codelineno-4-5 name=__codelineno-4-5 href=#__codelineno-4-5></a>T=450ms: User rotating backward (520°/s gyro) → Stage 3: +12 pts
-<a id=__codelineno-4-6 name=__codelineno-4-6 href=#__codelineno-4-6></a>T=2500ms: User immobilized on floor → Stage 4: +18 pts
-<a id=__codelineno-4-7 name=__codelineno-4-7 href=#__codelineno-4-7></a>T=3000ms: Heart rate spike detected (+35 BPM) → Stage 5: +8 pts
-<a id=__codelineno-4-8 name=__codelineno-4-8 href=#__codelineno-4-8></a>
-<a id=__codelineno-4-9 name=__codelineno-4-9 href=#__codelineno-4-9></a>──────────────────────────────────────────────────────────
-<a id=__codelineno-4-10 name=__codelineno-4-10 href=#__codelineno-4-10></a>Total Confidence Score: 15 + 15 + 12 + 18 + 8 = 68 pts
-<a id=__codelineno-4-11 name=__codelineno-4-11 href=#__codelineno-4-11></a>
-<a id=__codelineno-4-12 name=__codelineno-4-12 href=#__codelineno-4-12></a>Status: CONFIRMED_FALL
-<a id=__codelineno-4-13 name=__codelineno-4-13 href=#__codelineno-4-13></a>Action: 5-second audio alert, then emergency transmission
-</code></pre></div> <h2 id=adaptive-behavior>Adaptive Behavior<a class=headerlink href=#adaptive-behavior title="Permanent link">&para;</a></h2> <h3 id=enhanced-monitoring-mode-potential-fall>Enhanced Monitoring Mode (Potential Fall)<a class=headerlink href=#enhanced-monitoring-mode-potential-fall title="Permanent link">&para;</a></h3> <p>When confidence is 48-66 points:</p> <ol> <li><strong>Continue analysis for 10 additional seconds</strong></li> <li><strong>Monitor for recovery signals</strong>:</li> <li>Coordinated movement patterns</li> <li>Return to upright position</li> <li> <p>Normal walking resumption</p> </li> <li> <p><strong>Upgrade to Fall if</strong>:</p> </li> <li>No recovery detected AND</li> <li>Heart rate remains elevated AND</li> <li>Device orientation suggests lying down</li> </ol> <h3 id=user-response-window>User Response Window<a class=headerlink href=#user-response-window title="Permanent link">&para;</a></h3> <p>After alert activation:</p> <div class=highlight><pre><span></span><code><a id=__codelineno-5-1 name=__codelineno-5-1 href=#__codelineno-5-1></a>T=0:    Alert triggered (audio + haptic + visual)
-<a id=__codelineno-5-2 name=__codelineno-5-2 href=#__codelineno-5-2></a>T=0-5:  Loud siren
-<a id=__codelineno-5-3 name=__codelineno-5-3 href=#__codelineno-5-3></a>T=5-30: Reduced volume alert every 5 seconds
-<a id=__codelineno-5-4 name=__codelineno-5-4 href=#__codelineno-5-4></a>T=30:   Emergency contacts notified
-<a id=__codelineno-5-5 name=__codelineno-5-5 href=#__codelineno-5-5></a>
-<a id=__codelineno-5-6 name=__codelineno-5-6 href=#__codelineno-5-6></a>During window:
-<a id=__codelineno-5-7 name=__codelineno-5-7 href=#__codelineno-5-7></a>├─ User moves significantly → Alert cancelled
-<a id=__codelineno-5-8 name=__codelineno-5-8 href=#__codelineno-5-8></a>├─ SOS button pressed → Immediate notification
-<a id=__codelineno-5-9 name=__codelineno-5-9 href=#__codelineno-5-9></a>└─ No response → Emergency services contacted
+    D --&gt; R</code></pre> <h2 id=timing-architecture>Timing Architecture<a class=headerlink href=#timing-architecture title="Permanent link">&para;</a></h2> <h3 id=sensor-data-acquisition>Sensor Data Acquisition<a class=headerlink href=#sensor-data-acquisition title="Permanent link">&para;</a></h3> <ul> <li><strong>Frequency</strong>: 100 Hz (10ms intervals)</li> <li><strong>Latency</strong>: &lt;5ms from sensor reading to algorithm processing</li> <li><strong>Resolution</strong>: Sufficient to capture fall dynamics</li> </ul> <h3 id=detection-window>Detection Window<a class=headerlink href=#detection-window title="Permanent link">&para;</a></h3> <ul> <li><strong>Primary</strong>: 10 seconds of active analysis</li> <li><strong>Extended</strong>: Additional 10 seconds in enhanced monitoring</li> <li><strong>History Buffer</strong>: Maintains last 100 samples (~1 second)</li> </ul> <h3 id=alert-response>Alert Response<a class=headerlink href=#alert-response title="Permanent link">&para;</a></h3> <ul> <li><strong>Detection to First Alert</strong>: &lt;2 seconds</li> <li><strong>Alert Duration</strong>: 5 seconds siren + 25 seconds wait</li> <li><strong>Total Response Window</strong>: 30 seconds</li> </ul> <h2 id=multi-stage-architecture>Multi-Stage Architecture<a class=headerlink href=#multi-stage-architecture title="Permanent link">&para;</a></h2> <h3 id=why-5-stages>Why 5 Stages?<a class=headerlink href=#why-5-stages title="Permanent link">&para;</a></h3> <p>A fall event follows a predictable physical sequence:</p> <pre class=mermaid><code>timeline
+    title Real Fall Timeline - Temporal Sequence
+    T0 : Initial loss of balance
+    T1 : Free fall begins&lt;br/&gt;Acceleration &amp;lt;0.5g
+    T2 : User rotates uncontrollably&lt;br/&gt;High angular velocity
+    T3 : Impact with ground&lt;br/&gt;Acceleration &amp;gt;3g
+    T4 : User remains incapacitated&lt;br/&gt;Acceleration 0.8-1.2g&lt;br/&gt;No movement</code></pre> <p>Each stage <strong>confirms the previous</strong> one: - No Stage 1 detected → <strong>Not a fall</strong> - No Stage 2 after Stage 1 → <strong>Not a fall</strong> - No Stage 3-4 sequence → <strong>Possible false positive</strong></p> <h3 id=stage-interdependencies>Stage Interdependencies<a class=headerlink href=#stage-interdependencies title="Permanent link">&para;</a></h3> <pre class=mermaid><code>graph TD
+    S1["Stage 1: Free Fall&lt;br/&gt;Acceleration &amp;lt;0.5g"]
+    S2["Stage 2: Impact&lt;br/&gt;Acceleration &amp;gt;3g"]
+    S3["Stage 3: Rotation&lt;br/&gt;Angular velocity &amp;gt;150°/s"]
+    S4["Stage 4: Inactivity&lt;br/&gt;0.8-1.2g for 2+ sec"]
+    S5["Stage 5: Filters&lt;br/&gt;BMP280, HR, FSR"]
+
+    S1 --&gt;|Required for| S2
+    S1 --&gt;|False positive filter| S1
+    S2 --&gt;|Confirms| S1
+    S2 --&gt;|Timing-dependent on| S1
+    S3 --&gt;|Validates motion| S2
+    S3 --&gt;|Rules out self-caught| S3
+    S4 --&gt;|Confirms incapacity| S3
+    S4 --&gt;|Discriminates recovery| S4
+    S5 --&gt;|Final validation| S4
+
+    style S1 fill:#ff6b6b,color:#fff
+    style S2 fill:#ff8c42,color:#fff
+    style S3 fill:#ffd93d,color:#000
+    style S4 fill:#6bcf7f,color:#fff
+    style S5 fill:#4d96ff,color:#fff</code></pre> <p><strong>How Stages Work Together:</strong> - <strong>Stage 1</strong> is the entry point - without free fall detection, no fall is detected - <strong>Stage 2</strong> validates Stage 1 by detecting impact after the free fall - <strong>Stage 3</strong> confirms uncontrolled motion (not a controlled catch) - <strong>Stage 4</strong> verifies the user cannot immediately recover - <strong>Stage 5</strong> uses secondary sensors to reduce false positives</p> <h2 id=confidence-scoring-system>Confidence Scoring System<a class=headerlink href=#confidence-scoring-system title="Permanent link">&para;</a></h2> <p>Instead of binary yes/no decisions, SmartFall accumulates <strong>confidence points</strong> (0-105 total):</p> <h3 id=maximum-points-per-stage>Maximum Points per Stage<a class=headerlink href=#maximum-points-per-stage title="Permanent link">&para;</a></h3> <table> <thead> <tr> <th>Stage</th> <th>Max Points</th> <th>Focus</th> </tr> </thead> <tbody> <tr> <td><strong>Stage 1</strong></td> <td>25 pts</td> <td>Free fall detection</td> </tr> <tr> <td><strong>Stage 2</strong></td> <td>25 pts</td> <td>Impact confirmation</td> </tr> <tr> <td><strong>Stage 3</strong></td> <td>20 pts</td> <td>Rotation validation</td> </tr> <tr> <td><strong>Stage 4</strong></td> <td>20 pts</td> <td>Incapacity duration</td> </tr> <tr> <td><strong>Stage 5</strong></td> <td>15 pts</td> <td>False positive filtering</td> </tr> <tr> <td><strong>TOTAL</strong></td> <td><strong>105 pts</strong></td> <td>Comprehensive score</td> </tr> </tbody> </table> <h3 id=scoring-formula>Scoring Formula<a class=headerlink href=#scoring-formula title="Permanent link">&para;</a></h3> <div class=highlight><pre><span></span><code><a id=__codelineno-0-1 name=__codelineno-0-1 href=#__codelineno-0-1></a>Total Confidence = Σ(Stage Points) + Σ(Filter Points)
+<a id=__codelineno-0-2 name=__codelineno-0-2 href=#__codelineno-0-2></a>
+<a id=__codelineno-0-3 name=__codelineno-0-3 href=#__codelineno-0-3></a>Then classify:
+<a id=__codelineno-0-4 name=__codelineno-0-4 href=#__codelineno-0-4></a>├─ ≥76 pts:  HIGH CONFIDENCE → Immediate alert
+<a id=__codelineno-0-5 name=__codelineno-0-5 href=#__codelineno-0-5></a>├─ 67-75 pts: CONFIRMED → 5-second delay
+<a id=__codelineno-0-6 name=__codelineno-0-6 href=#__codelineno-0-6></a>├─ 48-66 pts: POTENTIAL → Monitor 10 more seconds
+<a id=__codelineno-0-7 name=__codelineno-0-7 href=#__codelineno-0-7></a>├─ 30-47 pts: SUSPICIOUS → Continue normal monitoring
+<a id=__codelineno-0-8 name=__codelineno-0-8 href=#__codelineno-0-8></a>└─ &lt;30 pts:   NO FALL → Reset
+</code></pre></div> <h2 id=decision-logic-thresholds>Decision Logic Thresholds<a class=headerlink href=#decision-logic-thresholds title="Permanent link">&para;</a></h2> <div class=highlight><pre><span></span><code><a id=__codelineno-1-1 name=__codelineno-1-1 href=#__codelineno-1-1></a>Confidence Points
+<a id=__codelineno-1-2 name=__codelineno-1-2 href=#__codelineno-1-2></a>     105 ┤
+<a id=__codelineno-1-3 name=__codelineno-1-3 href=#__codelineno-1-3></a>         │                                   ╱ HIGH CONFIDENCE
+<a id=__codelineno-1-4 name=__codelineno-1-4 href=#__codelineno-1-4></a>         │                                ╱│ Immediate alert
+<a id=__codelineno-1-5 name=__codelineno-1-5 href=#__codelineno-1-5></a>      76 ├───────────────────────────────╱──┤
+<a id=__codelineno-1-6 name=__codelineno-1-6 href=#__codelineno-1-6></a>         │                            ╱│ CONFIRMED
+<a id=__codelineno-1-7 name=__codelineno-1-7 href=#__codelineno-1-7></a>      67 ├────────────────────────╱───┤│ 5s delay alert
+<a id=__codelineno-1-8 name=__codelineno-1-8 href=#__codelineno-1-8></a>         │                    ╱│ POTENTIAL
+<a id=__codelineno-1-9 name=__codelineno-1-9 href=#__codelineno-1-9></a>      48 ├─────────────────╱───┤│ Extended monitoring
+<a id=__codelineno-1-10 name=__codelineno-1-10 href=#__codelineno-1-10></a>         │             ╱│ SUSPICIOUS
+<a id=__codelineno-1-11 name=__codelineno-1-11 href=#__codelineno-1-11></a>      30 ├──────────╱───┤│ Normal monitoring
+<a id=__codelineno-1-12 name=__codelineno-1-12 href=#__codelineno-1-12></a>         │      ╱│ NO FALL
+<a id=__codelineno-1-13 name=__codelineno-1-13 href=#__codelineno-1-13></a>       0 └────╱──────────────────────────────
+<a id=__codelineno-1-14 name=__codelineno-1-14 href=#__codelineno-1-14></a>             Detection      Stages 1-5 Process
+</code></pre></div> <h2 id=real-world-example-backward-fall>Real-World Example: Backward Fall<a class=headerlink href=#real-world-example-backward-fall title="Permanent link">&para;</a></h2> <div class=highlight><pre><span></span><code><a id=__codelineno-2-1 name=__codelineno-2-1 href=#__codelineno-2-1></a>Event Timeline:
+<a id=__codelineno-2-2 name=__codelineno-2-2 href=#__codelineno-2-2></a>T=0ms:   Person loses balance (backward motion detected)
+<a id=__codelineno-2-3 name=__codelineno-2-3 href=#__codelineno-2-3></a>T=150ms: Free fall begins (acceleration drops to 0.2g) → Stage 1: +15 pts
+<a id=__codelineno-2-4 name=__codelineno-2-4 href=#__codelineno-2-4></a>T=400ms: Head impacts floor (8g acceleration spike) → Stage 2: +15 pts
+<a id=__codelineno-2-5 name=__codelineno-2-5 href=#__codelineno-2-5></a>T=450ms: User rotating backward (520°/s gyro) → Stage 3: +12 pts
+<a id=__codelineno-2-6 name=__codelineno-2-6 href=#__codelineno-2-6></a>T=2500ms: User immobilized on floor → Stage 4: +18 pts
+<a id=__codelineno-2-7 name=__codelineno-2-7 href=#__codelineno-2-7></a>T=3000ms: Heart rate spike detected (+35 BPM) → Stage 5: +8 pts
+<a id=__codelineno-2-8 name=__codelineno-2-8 href=#__codelineno-2-8></a>
+<a id=__codelineno-2-9 name=__codelineno-2-9 href=#__codelineno-2-9></a>──────────────────────────────────────────────────────────
+<a id=__codelineno-2-10 name=__codelineno-2-10 href=#__codelineno-2-10></a>Total Confidence Score: 15 + 15 + 12 + 18 + 8 = 68 pts
+<a id=__codelineno-2-11 name=__codelineno-2-11 href=#__codelineno-2-11></a>
+<a id=__codelineno-2-12 name=__codelineno-2-12 href=#__codelineno-2-12></a>Status: CONFIRMED_FALL
+<a id=__codelineno-2-13 name=__codelineno-2-13 href=#__codelineno-2-13></a>Action: 5-second audio alert, then emergency transmission
+</code></pre></div> <h2 id=adaptive-behavior>Adaptive Behavior<a class=headerlink href=#adaptive-behavior title="Permanent link">&para;</a></h2> <h3 id=enhanced-monitoring-mode-potential-fall>Enhanced Monitoring Mode (Potential Fall)<a class=headerlink href=#enhanced-monitoring-mode-potential-fall title="Permanent link">&para;</a></h3> <p>When confidence is 48-66 points:</p> <ol> <li><strong>Continue analysis for 10 additional seconds</strong></li> <li><strong>Monitor for recovery signals</strong>:</li> <li>Coordinated movement patterns</li> <li>Return to upright position</li> <li> <p>Normal walking resumption</p> </li> <li> <p><strong>Upgrade to Fall if</strong>:</p> </li> <li>No recovery detected AND</li> <li>Heart rate remains elevated AND</li> <li>Device orientation suggests lying down</li> </ol> <h3 id=user-response-window>User Response Window<a class=headerlink href=#user-response-window title="Permanent link">&para;</a></h3> <p>After alert activation:</p> <div class=highlight><pre><span></span><code><a id=__codelineno-3-1 name=__codelineno-3-1 href=#__codelineno-3-1></a>T=0:    Alert triggered (audio + haptic + visual)
+<a id=__codelineno-3-2 name=__codelineno-3-2 href=#__codelineno-3-2></a>T=0-5:  Loud siren
+<a id=__codelineno-3-3 name=__codelineno-3-3 href=#__codelineno-3-3></a>T=5-30: Reduced volume alert every 5 seconds
+<a id=__codelineno-3-4 name=__codelineno-3-4 href=#__codelineno-3-4></a>T=30:   Emergency contacts notified
+<a id=__codelineno-3-5 name=__codelineno-3-5 href=#__codelineno-3-5></a>
+<a id=__codelineno-3-6 name=__codelineno-3-6 href=#__codelineno-3-6></a>During window:
+<a id=__codelineno-3-7 name=__codelineno-3-7 href=#__codelineno-3-7></a>├─ User moves significantly → Alert cancelled
+<a id=__codelineno-3-8 name=__codelineno-3-8 href=#__codelineno-3-8></a>├─ SOS button pressed → Immediate notification
+<a id=__codelineno-3-9 name=__codelineno-3-9 href=#__codelineno-3-9></a>└─ No response → Emergency services contacted
 </code></pre></div> <h2 id=false-positive-reduction-strategy>False Positive Reduction Strategy<a class=headerlink href=#false-positive-reduction-strategy title="Permanent link">&para;</a></h2> <p>SmartFall prevents false alarms through:</p> <h3 id=1-sequential-validation>1. Sequential Validation<a class=headerlink href=#1-sequential-validation title="Permanent link">&para;</a></h3> <p>Each stage must be triggered in order. A fall without free fall isn't detected.</p> <h3 id=2-timing-constraints>2. Timing Constraints<a class=headerlink href=#2-timing-constraints title="Permanent link">&para;</a></h3> <p>Stages must occur within specific time windows (free fall then impact within 1 second).</p> <h3 id=3-multi-sensor-confirmation>3. Multi-Sensor Confirmation<a class=headerlink href=#3-multi-sensor-confirmation title="Permanent link">&para;</a></h3> <p>Secondary sensors (pressure, heart rate, FSR) validate primary motion sensors.</p> <h3 id=4-movement-recognition>4. Movement Recognition<a class=headerlink href=#4-movement-recognition title="Permanent link">&para;</a></h3> <p>Post-fall movement detection triggers immediate alert cancellation.</p> <h3 id=5-physiological-validation>5. Physiological Validation<a class=headerlink href=#5-physiological-validation title="Permanent link">&para;</a></h3> <p>Heart rate and blood oxygen changes correlate with actual emergency vs device drop.</p> <h2 id=performance-targets>Performance Targets<a class=headerlink href=#performance-targets title="Permanent link">&para;</a></h2> <table> <thead> <tr> <th>Metric</th> <th>Target</th> <th>Status</th> </tr> </thead> <tbody> <tr> <td><strong>Detection Sensitivity</strong></td> <td>&gt;95% for true falls</td> <td>Achieved</td> </tr> <tr> <td><strong>False Positive Rate</strong></td> <td>&lt;5%</td> <td>Optimized</td> </tr> <tr> <td><strong>Detection Latency</strong></td> <td>&lt;2 seconds</td> <td>Achievable</td> </tr> <tr> <td><strong>Battery Impact</strong></td> <td>&lt;5% per day</td> <td>Achieved</td> </tr> <tr> <td><strong>CPU Utilization</strong></td> <td>&lt;5%</td> <td>Verified</td> </tr> </tbody> </table> <h2 id=next-steps>Next Steps<a class=headerlink href=#next-steps title="Permanent link">&para;</a></h2> <ol> <li><strong>Detailed Stages</strong>: See <a href=../stages/ >Detection Stages</a></li> <li><strong>Confidence Scoring</strong>: See <a href=../confidence-scoring/ >Confidence Scoring</a></li> <li><strong>Implementation</strong>: See <a href=../../firmware/fall-detection/ >Fall Detection Code</a></li> <li><strong>Testing</strong>: See <a href=../../testing/fall-simulation/ >Fall Simulation Tests</a></li> </ol> </article> </div> <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var tab,labels=set.querySelector(".tabbed-labels");for(tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script> <script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script> </div> <button type=button class="md-top md-icon" data-md-component=top hidden> <svg xmlns=http://www.w3.org/2000/svg viewbox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8v12Z"/></svg> Back to top </button> </main> <footer class=md-footer> <div class="md-footer-meta md-typeset"> <div class="md-footer-meta__inner md-grid"> <div class=md-copyright> Made with <a href=https://squidfunk.github.io/mkdocs-material/ target=_blank rel=noopener> Material for MkDocs </a> </div> </div> </div> </footer> </div> <div class=md-dialog data-md-component=dialog> <div class="md-dialog__inner md-typeset"></div> </div> <script id=__config type=application/json>{"base": "../..", "features": ["navigation.tabs", "navigation.tabs.sticky", "navigation.sections", "navigation.top", "search.suggest", "search.highlight", "content.code.copy", "content.tabs.link", "toc.follow"], "search": "../../assets/javascripts/workers/search.b8dbb3d2.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script> <script src=../../assets/javascripts/bundle.3220b9d7.min.js></script> </body> </html>
