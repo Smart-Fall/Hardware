@@ -107,11 +107,11 @@ enum FallStatus_t {
 graph TD
     A["Confidence Score Calculated"] --> B{Score Range?}
 
-    B -->|≥ 76| C["🔴 HIGH CONFIDENCE FALL"]
-    B -->|67-75| D["🟠 CONFIRMED FALL"]
-    B -->|48-66| E["🟡 POTENTIAL FALL"]
-    B -->|30-47| F["🔵 SUSPICIOUS ACTIVITY"]
-    B -->|&lt; 30| G["⚪ NO FALL DETECTED"]
+    B -->|≥ 76| C["[HIGH CONFIDENCE]<br/>FALL"]
+    B -->|67-75| D["[CONFIRMED]<br/>FALL"]
+    B -->|48-66| E["[POTENTIAL]<br/>FALL"]
+    B -->|30-47| F["[SUSPICIOUS]<br/>ACTIVITY"]
+    B -->|&lt; 30| G["[CLEAR]<br/>NO FALL DETECTED"]
 
     C --> C1["✓ Immediate alert<br/>✓ Play siren<br/>✓ Notify emergency<br/>✓ 30s countdown"]
     C1 --> C2{User Response?}
@@ -119,7 +119,7 @@ graph TD
     C2 -->|SOS button| C4["Confirm emergency"]
     C2 -->|No response| C5["Contact services"]
 
-    D --> D1["⏱ 5-second delay<br/>Monitor score"]
+    D --> D1["→ 5-second delay<br/>Monitor score"]
     D1 --> D2{Score remains high?}
     D2 -->|≥67| D3["Trigger alert"]
     D2 -->|&lt;67 or movement| D4["Cancel, resume monitoring"]
@@ -194,7 +194,7 @@ graph LR
     F --> G
 
     G --> H{New Score < 30?}
-    H -->|Yes| I["✓ NO_FALL_DETECTED<br/>Resume baseline"]
+    H -->|Yes| I["[OK] NO_FALL_DETECTED<br/>Resume baseline"]
     H -->|No| J["Continue monitoring"]
 
     style A fill:#4ade80,color:#000
@@ -222,7 +222,7 @@ graph LR
     F --> G
 
     G --> H{Score ≥ 67?}
-    H -->|Yes| I["✓ CONFIRMED_FALL<br/>Trigger 5s delay alert"]
+    H -->|Yes| I["[ALERT] CONFIRMED_FALL<br/>Trigger 5s delay alert"]
     H -->|No| J["Continue enhanced<br/>monitoring"]
 
     style A fill:#ef4444,color:#fff

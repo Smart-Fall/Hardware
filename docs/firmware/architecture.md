@@ -88,22 +88,22 @@ The `SmartFall.ino` main sketch follows this execution pattern:
 
 ```mermaid
 graph TD
-    A["🚀 System Startup"]
+    A["System Startup"]
     A1["✓ Initialize sensors<br/>✓ Configure GPIO pins<br/>✓ Start WiFi/BLE<br/>✓ Print startup banner"]
     A --> A1
 
-    A1 --> B["⚙️ Main Loop<br/>10ms / 100Hz"]
+    A1 --> B["Main Loop<br/>10ms / 100Hz"]
 
-    B --> B1["1️⃣ Read all<br/>sensor data"]
-    B1 --> B2["2️⃣ Pass to<br/>Fall_Detector"]
-    B2 --> B3["3️⃣ Check SOS<br/>button"]
-    B3 --> B4["4️⃣ Process<br/>emergency alert"]
-    B4 --> B5["5️⃣ Update WiFi/<br/>BLE status"]
-    B5 --> B6["6️⃣ Transmit alert<br/>if needed"]
-    B6 --> B7["7️⃣ Update UI<br/>LED/audio"]
-    B7 --> B8["8️⃣ Sleep for<br/>remaining time"]
+    B --> B1["(1) Read all<br/>sensor data"]
+    B1 --> B2["(2) Pass to<br/>Fall_Detector"]
+    B2 --> B3["(3) Check SOS<br/>button"]
+    B3 --> B4["(4) Process<br/>emergency alert"]
+    B4 --> B5["(5) Update WiFi/<br/>BLE status"]
+    B5 --> B6["(6) Transmit alert<br/>if needed"]
+    B6 --> B7["(7) Update UI<br/>LED/audio"]
+    B7 --> B8["(8) Sleep for<br/>remaining time"]
 
-    B8 --> C["⏱️ Loop every 10ms"]
+    B8 --> C["Loop every 10ms"]
     C -->|Continue| B
 
     style A fill:#4ade80,color:#000
