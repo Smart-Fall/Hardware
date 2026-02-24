@@ -133,73 +133,120 @@
 <a id=__codelineno-15-3 name=__codelineno-15-3 href=#__codelineno-15-3></a><span class=k>const</span><span class=w> </span><span class=kt>uint8_t</span><span class=w> </span><span class=n>POTENTIAL_THRESHOLD</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=mi>48</span><span class=p>;</span><span class=w>         </span><span class=c1>// 48-66: POTENTIAL (monitor)</span>
 <a id=__codelineno-15-4 name=__codelineno-15-4 href=#__codelineno-15-4></a><span class=k>const</span><span class=w> </span><span class=kt>uint8_t</span><span class=w> </span><span class=n>SUSPICIOUS_THRESHOLD</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=mi>29</span><span class=p>;</span><span class=w>        </span><span class=c1>// 30-47: SUSPICIOUS (normal)</span>
 <a id=__codelineno-15-5 name=__codelineno-15-5 href=#__codelineno-15-5></a><span class=w>                                                 </span><span class=c1>// &lt;29: NO FALL</span>
-</code></pre></div> <h2 id=alert-logic>Alert Logic<a class=headerlink href=#alert-logic title="Permanent link">&para;</a></h2> <h3 id=immediate-action-76-points>Immediate Action (≥76 points)<a class=headerlink href=#immediate-action-76-points title="Permanent link">&para;</a></h3> <div class=highlight><pre><span></span><code><a id=__codelineno-16-1 name=__codelineno-16-1 href=#__codelineno-16-1></a>Confidence Score ≥ 76
-<a id=__codelineno-16-2 name=__codelineno-16-2 href=#__codelineno-16-2></a>    │
-<a id=__codelineno-16-3 name=__codelineno-16-3 href=#__codelineno-16-3></a>    ├─→ Play ALERT_SIREN (5 seconds)
-<a id=__codelineno-16-4 name=__codelineno-16-4 href=#__codelineno-16-4></a>    ├─→ Send emergency alert (WiFi + BLE)
-<a id=__codelineno-16-5 name=__codelineno-16-5 href=#__codelineno-16-5></a>    ├─→ Start 30-second countdown
-<a id=__codelineno-16-6 name=__codelineno-16-6 href=#__codelineno-16-6></a>    └─→ Wait for:
-<a id=__codelineno-16-7 name=__codelineno-16-7 href=#__codelineno-16-7></a>        ├─ User response (movement or button)
-<a id=__codelineno-16-8 name=__codelineno-16-8 href=#__codelineno-16-8></a>        ├─ SOS button confirmation
-<a id=__codelineno-16-9 name=__codelineno-16-9 href=#__codelineno-16-9></a>        └─ Countdown timeout
-</code></pre></div> <h3 id=confirmed-fall-67-75-points>Confirmed Fall (67-75 points)<a class=headerlink href=#confirmed-fall-67-75-points title="Permanent link">&para;</a></h3> <div class=highlight><pre><span></span><code><a id=__codelineno-17-1 name=__codelineno-17-1 href=#__codelineno-17-1></a>Confidence Score 67-75
-<a id=__codelineno-17-2 name=__codelineno-17-2 href=#__codelineno-17-2></a>    │
-<a id=__codelineno-17-3 name=__codelineno-17-3 href=#__codelineno-17-3></a>    ├─→ Wait 5 seconds
-<a id=__codelineno-17-4 name=__codelineno-17-4 href=#__codelineno-17-4></a>    ├─→ If still HIGH:
-<a id=__codelineno-17-5 name=__codelineno-17-5 href=#__codelineno-17-5></a>    │   ├─→ Play ALERT_SIREN
-<a id=__codelineno-17-6 name=__codelineno-17-6 href=#__codelineno-17-6></a>    │   ├─→ Send alert
-<a id=__codelineno-17-7 name=__codelineno-17-7 href=#__codelineno-17-7></a>    │   └─→ Start 30-second countdown
-<a id=__codelineno-17-8 name=__codelineno-17-8 href=#__codelineno-17-8></a>    └─→ If resolved (movement detected):
-<a id=__codelineno-17-9 name=__codelineno-17-9 href=#__codelineno-17-9></a>        └─→ Cancel alert
-</code></pre></div> <h3 id=potential-fall-48-66-points>Potential Fall (48-66 points)<a class=headerlink href=#potential-fall-48-66-points title="Permanent link">&para;</a></h3> <div class=highlight><pre><span></span><code><a id=__codelineno-18-1 name=__codelineno-18-1 href=#__codelineno-18-1></a>Confidence Score 48-66
-<a id=__codelineno-18-2 name=__codelineno-18-2 href=#__codelineno-18-2></a>    │
-<a id=__codelineno-18-3 name=__codelineno-18-3 href=#__codelineno-18-3></a>    ├─→ Enhanced monitoring (10 more seconds)
-<a id=__codelineno-18-4 name=__codelineno-18-4 href=#__codelineno-18-4></a>    ├─→ Check for recovery movements
-<a id=__codelineno-18-5 name=__codelineno-18-5 href=#__codelineno-18-5></a>    ├─→ Monitor HR and position
-<a id=__codelineno-18-6 name=__codelineno-18-6 href=#__codelineno-18-6></a>    └─→ If score ≥67: Escalate to Confirmed
-<a id=__codelineno-18-7 name=__codelineno-18-7 href=#__codelineno-18-7></a>       If resolves: Return to normal
-</code></pre></div> <h2 id=sensor-history>Sensor History<a class=headerlink href=#sensor-history title="Permanent link">&para;</a></h2> <p>Fall detector maintains a sliding window of recent data:</p> <div class=highlight><pre><span></span><code><a id=__codelineno-19-1 name=__codelineno-19-1 href=#__codelineno-19-1></a><span class=c1>// Get full history</span>
-<a id=__codelineno-19-2 name=__codelineno-19-2 href=#__codelineno-19-2></a><span class=n>SensorData_t</span><span class=w> </span><span class=o>*</span><span class=n>history</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>fall_detector</span><span class=p>.</span><span class=n>getSensorHistory</span><span class=p>();</span>
-<a id=__codelineno-19-3 name=__codelineno-19-3 href=#__codelineno-19-3></a><span class=kt>uint8_t</span><span class=w> </span><span class=n>count</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>fall_detector</span><span class=p>.</span><span class=n>getHistoryCount</span><span class=p>();</span>
-<a id=__codelineno-19-4 name=__codelineno-19-4 href=#__codelineno-19-4></a>
-<a id=__codelineno-19-5 name=__codelineno-19-5 href=#__codelineno-19-5></a><span class=c1>// Process history</span>
-<a id=__codelineno-19-6 name=__codelineno-19-6 href=#__codelineno-19-6></a><span class=k>for</span><span class=w> </span><span class=p>(</span><span class=kt>uint8_t</span><span class=w> </span><span class=n>i</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=mi>0</span><span class=p>;</span><span class=w> </span><span class=n>i</span><span class=w> </span><span class=o>&lt;</span><span class=w> </span><span class=n>count</span><span class=p>;</span><span class=w> </span><span class=n>i</span><span class=o>++</span><span class=p>)</span><span class=w> </span><span class=p>{</span>
-<a id=__codelineno-19-7 name=__codelineno-19-7 href=#__codelineno-19-7></a><span class=w>    </span><span class=n>SensorData_t</span><span class=w> </span><span class=o>&amp;</span><span class=n>sample</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>history</span><span class=p>[</span><span class=n>i</span><span class=p>];</span>
-<a id=__codelineno-19-8 name=__codelineno-19-8 href=#__codelineno-19-8></a><span class=w>    </span><span class=kt>float</span><span class=w> </span><span class=n>accel</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>sqrt</span><span class=p>(</span><span class=n>sample</span><span class=p>.</span><span class=n>accel_x</span><span class=o>*</span><span class=n>sample</span><span class=p>.</span><span class=n>accel_x</span><span class=w> </span><span class=o>+</span>
-<a id=__codelineno-19-9 name=__codelineno-19-9 href=#__codelineno-19-9></a><span class=w>                       </span><span class=n>sample</span><span class=p>.</span><span class=n>accel_y</span><span class=o>*</span><span class=n>sample</span><span class=p>.</span><span class=n>accel_y</span><span class=w> </span><span class=o>+</span>
-<a id=__codelineno-19-10 name=__codelineno-19-10 href=#__codelineno-19-10></a><span class=w>                       </span><span class=n>sample</span><span class=p>.</span><span class=n>accel_z</span><span class=o>*</span><span class=n>sample</span><span class=p>.</span><span class=n>accel_z</span><span class=p>);</span>
-<a id=__codelineno-19-11 name=__codelineno-19-11 href=#__codelineno-19-11></a><span class=w>    </span><span class=n>Serial</span><span class=p>.</span><span class=n>print</span><span class=p>(</span><span class=s>&quot;Sample &quot;</span><span class=p>);</span>
-<a id=__codelineno-19-12 name=__codelineno-19-12 href=#__codelineno-19-12></a><span class=w>    </span><span class=n>Serial</span><span class=p>.</span><span class=n>print</span><span class=p>(</span><span class=n>i</span><span class=p>);</span>
-<a id=__codelineno-19-13 name=__codelineno-19-13 href=#__codelineno-19-13></a><span class=w>    </span><span class=n>Serial</span><span class=p>.</span><span class=n>print</span><span class=p>(</span><span class=s>&quot;: &quot;</span><span class=p>);</span>
-<a id=__codelineno-19-14 name=__codelineno-19-14 href=#__codelineno-19-14></a><span class=w>    </span><span class=n>Serial</span><span class=p>.</span><span class=n>print</span><span class=p>(</span><span class=n>accel</span><span class=p>);</span>
-<a id=__codelineno-19-15 name=__codelineno-19-15 href=#__codelineno-19-15></a><span class=w>    </span><span class=n>Serial</span><span class=p>.</span><span class=n>println</span><span class=p>(</span><span class=s>&quot;g&quot;</span><span class=p>);</span>
-<a id=__codelineno-19-16 name=__codelineno-19-16 href=#__codelineno-19-16></a><span class=p>}</span>
-</code></pre></div> <div class="admonition info"> <p class=admonition-title>History Buffer</p> <ul> <li><strong>Size</strong>: 100 samples (10 seconds at 100Hz)</li> <li><strong>Resolution</strong>: ~100 bytes per sample</li> <li><strong>Total Memory</strong>: ~10 KB</li> <li><strong>Purpose</strong>: Replay detection window for debugging</li> </ul> </div> <h2 id=debug-output>Debug Output<a class=headerlink href=#debug-output title="Permanent link">&para;</a></h2> <p>Enable serial debug output for algorithm analysis:</p> <div class=highlight><pre><span></span><code><a id=__codelineno-20-1 name=__codelineno-20-1 href=#__codelineno-20-1></a><span class=c1>// In Config.h</span>
-<a id=__codelineno-20-2 name=__codelineno-20-2 href=#__codelineno-20-2></a><span class=cp>#define DEBUG_ALGORITHM_STEPS true</span>
-<a id=__codelineno-20-3 name=__codelineno-20-3 href=#__codelineno-20-3></a>
-<a id=__codelineno-20-4 name=__codelineno-20-4 href=#__codelineno-20-4></a><span class=c1>// Output example:</span>
-<a id=__codelineno-20-5 name=__codelineno-20-5 href=#__codelineno-20-5></a><span class=c1>// Stage 1 triggered: 15 pts (duration: 350ms, min accel: 0.15g)</span>
-<a id=__codelineno-20-6 name=__codelineno-20-6 href=#__codelineno-20-6></a><span class=c1>// Stage 2 triggered: 20 pts (impact: 4.5g, timing: 0.3s)</span>
-<a id=__codelineno-20-7 name=__codelineno-20-7 href=#__codelineno-20-7></a><span class=c1>// Stage 3 triggered: 15 pts (rotation: 380°/s, change: 85°)</span>
-<a id=__codelineno-20-8 name=__codelineno-20-8 href=#__codelineno-20-8></a><span class=c1>// Stage 4 triggered: 18 pts (inactivity: 2.5s)</span>
-<a id=__codelineno-20-9 name=__codelineno-20-9 href=#__codelineno-20-9></a><span class=c1>// Filter Score: 12 pts (HR spike: +8, Pressure: +4)</span>
-<a id=__codelineno-20-10 name=__codelineno-20-10 href=#__codelineno-20-10></a><span class=c1>// ─────────────────────────</span>
-<a id=__codelineno-20-11 name=__codelineno-20-11 href=#__codelineno-20-11></a><span class=c1>// TOTAL CONFIDENCE: 80 pts → HIGH_CONFIDENCE_FALL</span>
-</code></pre></div> <h2 id=integration-with-emergency-system>Integration with Emergency System<a class=headerlink href=#integration-with-emergency-system title="Permanent link">&para;</a></h2> <div class=highlight><pre><span></span><code><a id=__codelineno-21-1 name=__codelineno-21-1 href=#__codelineno-21-1></a><span class=c1>// When fall detected</span>
-<a id=__codelineno-21-2 name=__codelineno-21-2 href=#__codelineno-21-2></a><span class=k>if</span><span class=w> </span><span class=p>(</span><span class=n>fall_detector</span><span class=p>.</span><span class=n>getCurrentStatus</span><span class=p>()</span><span class=w> </span><span class=o>&gt;=</span><span class=w> </span><span class=n>CONFIRMED_FALL</span><span class=p>)</span><span class=w> </span><span class=p>{</span>
-<a id=__codelineno-21-3 name=__codelineno-21-3 href=#__codelineno-21-3></a><span class=w>    </span><span class=c1>// Create emergency payload</span>
-<a id=__codelineno-21-4 name=__codelineno-21-4 href=#__codelineno-21-4></a><span class=w>    </span><span class=n>EmergencyData_t</span><span class=w> </span><span class=n>alert</span><span class=p>;</span>
-<a id=__codelineno-21-5 name=__codelineno-21-5 href=#__codelineno-21-5></a><span class=w>    </span><span class=n>alert</span><span class=p>.</span><span class=n>confidence_score</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>fall_detector</span><span class=p>.</span><span class=n>getCurrentStatus</span><span class=p>();</span>
-<a id=__codelineno-21-6 name=__codelineno-21-6 href=#__codelineno-21-6></a><span class=w>    </span><span class=n>alert</span><span class=p>.</span><span class=n>timestamp</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>millis</span><span class=p>();</span>
-<a id=__codelineno-21-7 name=__codelineno-21-7 href=#__codelineno-21-7></a>
-<a id=__codelineno-21-8 name=__codelineno-21-8 href=#__codelineno-21-8></a><span class=w>    </span><span class=c1>// Include sensor history</span>
-<a id=__codelineno-21-9 name=__codelineno-21-9 href=#__codelineno-21-9></a><span class=w>    </span><span class=n>SensorData_t</span><span class=w> </span><span class=o>*</span><span class=n>history</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>fall_detector</span><span class=p>.</span><span class=n>getSensorHistory</span><span class=p>();</span>
-<a id=__codelineno-21-10 name=__codelineno-21-10 href=#__codelineno-21-10></a><span class=w>    </span><span class=n>alert</span><span class=p>.</span><span class=n>sensor_count</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>fall_detector</span><span class=p>.</span><span class=n>getHistoryCount</span><span class=p>();</span>
-<a id=__codelineno-21-11 name=__codelineno-21-11 href=#__codelineno-21-11></a>
-<a id=__codelineno-21-12 name=__codelineno-21-12 href=#__codelineno-21-12></a><span class=w>    </span><span class=c1>// Send alert</span>
-<a id=__codelineno-21-13 name=__codelineno-21-13 href=#__codelineno-21-13></a><span class=w>    </span><span class=n>emergency_comms</span><span class=p>.</span><span class=n>sendAlert</span><span class=p>(</span><span class=n>alert</span><span class=p>);</span>
-<a id=__codelineno-21-14 name=__codelineno-21-14 href=#__codelineno-21-14></a>
-<a id=__codelineno-21-15 name=__codelineno-21-15 href=#__codelineno-21-15></a><span class=w>    </span><span class=c1>// Reset for next detection</span>
-<a id=__codelineno-21-16 name=__codelineno-21-16 href=#__codelineno-21-16></a><span class=w>    </span><span class=n>fall_detector</span><span class=p>.</span><span class=n>resetDetection</span><span class=p>();</span>
-<a id=__codelineno-21-17 name=__codelineno-21-17 href=#__codelineno-21-17></a><span class=p>}</span>
+</code></pre></div> <h2 id=alert-logic>Alert Logic<a class=headerlink href=#alert-logic title="Permanent link">&para;</a></h2> <h3 id=immediate-action-76-points>Immediate Action (≥76 points)<a class=headerlink href=#immediate-action-76-points title="Permanent link">&para;</a></h3> <pre class=mermaid><code>graph TD
+    A["Confidence Score&lt;br/&gt;≥ 76 points"]
+
+    B["Play ALERT_SIREN&lt;br/&gt;5 seconds"]
+    C["Send Emergency Alert&lt;br/&gt;WiFi + BLE"]
+    D["Start 30-second&lt;br/&gt;Countdown"]
+
+    E{User Response?}
+    E1["Movement Detected&lt;br/&gt;→ Cancel Alert"]
+    E2["SOS Button Pressed&lt;br/&gt;→ Confirm Emergency"]
+    E3["Countdown Timeout&lt;br/&gt;→ Contact Services"]
+
+    A --&gt; B
+    B --&gt; C
+    C --&gt; D
+    D --&gt; E
+
+    E --&gt;|Movement| E1
+    E --&gt;|SOS Button| E2
+    E --&gt;|30s Passed| E3
+
+    style A fill:#dc2626,color:#fff
+    style E1 fill:#16a34a,color:#fff
+    style E2 fill:#f97316,color:#fff
+    style E3 fill:#f97316,color:#fff</code></pre> <h3 id=confirmed-fall-67-75-points>Confirmed Fall (67-75 points)<a class=headerlink href=#confirmed-fall-67-75-points title="Permanent link">&para;</a></h3> <pre class=mermaid><code>graph TD
+    A["Confidence Score&lt;br/&gt;67-75 points"]
+
+    B["Wait 5 seconds&lt;br/&gt;Monitor score"]
+
+    C{Still High?}
+
+    D["Score remains HIGH&lt;br/&gt;≥67"]
+    D1["Play ALERT_SIREN"]
+    D2["Send Emergency Alert"]
+    D3["Start 30-second&lt;br/&gt;Countdown"]
+
+    E["Score Dropped&lt;br/&gt;or Movement Detected"]
+    E1["Cancel Alert&lt;br/&gt;Resume Monitoring"]
+
+    A --&gt; B
+    B --&gt; C
+
+    C --&gt;|Score ≥67| D
+    C --&gt;|Score &lt;67| E
+
+    D --&gt; D1 --&gt; D2 --&gt; D3
+    E --&gt; E1
+
+    style A fill:#f97316,color:#fff
+    style D fill:#dc2626,color:#fff
+    style E1 fill:#16a34a,color:#fff</code></pre> <h3 id=potential-fall-48-66-points>Potential Fall (48-66 points)<a class=headerlink href=#potential-fall-48-66-points title="Permanent link">&para;</a></h3> <pre class=mermaid><code>graph TD
+    A["Confidence Score&lt;br/&gt;48-66 points"]
+
+    B["Enhanced Monitoring&lt;br/&gt;+10 seconds"]
+    C["Check for recovery&lt;br/&gt;movements"]
+    D["Monitor HR and&lt;br/&gt;position"]
+
+    E{Detection?}
+
+    F["Score ≥67&lt;br/&gt;Escalate"]
+    F1["Trigger Alert"]
+
+    G["Clear Recovery&lt;br/&gt;Signals"]
+    G1["Cancel Monitoring&lt;br/&gt;Return to Normal"]
+
+    A --&gt; B --&gt; C --&gt; D --&gt; E
+
+    E --&gt;|Escalation| F --&gt; F1
+    E --&gt;|Recovery| G --&gt; G1
+
+    style A fill:#f59e0b,color:#000
+    style F fill:#dc2626,color:#fff
+    style G1 fill:#16a34a,color:#fff</code></pre> <h2 id=sensor-history>Sensor History<a class=headerlink href=#sensor-history title="Permanent link">&para;</a></h2> <p>Fall detector maintains a sliding window of recent data:</p> <div class=highlight><pre><span></span><code><a id=__codelineno-16-1 name=__codelineno-16-1 href=#__codelineno-16-1></a><span class=c1>// Get full history</span>
+<a id=__codelineno-16-2 name=__codelineno-16-2 href=#__codelineno-16-2></a><span class=n>SensorData_t</span><span class=w> </span><span class=o>*</span><span class=n>history</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>fall_detector</span><span class=p>.</span><span class=n>getSensorHistory</span><span class=p>();</span>
+<a id=__codelineno-16-3 name=__codelineno-16-3 href=#__codelineno-16-3></a><span class=kt>uint8_t</span><span class=w> </span><span class=n>count</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>fall_detector</span><span class=p>.</span><span class=n>getHistoryCount</span><span class=p>();</span>
+<a id=__codelineno-16-4 name=__codelineno-16-4 href=#__codelineno-16-4></a>
+<a id=__codelineno-16-5 name=__codelineno-16-5 href=#__codelineno-16-5></a><span class=c1>// Process history</span>
+<a id=__codelineno-16-6 name=__codelineno-16-6 href=#__codelineno-16-6></a><span class=k>for</span><span class=w> </span><span class=p>(</span><span class=kt>uint8_t</span><span class=w> </span><span class=n>i</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=mi>0</span><span class=p>;</span><span class=w> </span><span class=n>i</span><span class=w> </span><span class=o>&lt;</span><span class=w> </span><span class=n>count</span><span class=p>;</span><span class=w> </span><span class=n>i</span><span class=o>++</span><span class=p>)</span><span class=w> </span><span class=p>{</span>
+<a id=__codelineno-16-7 name=__codelineno-16-7 href=#__codelineno-16-7></a><span class=w>    </span><span class=n>SensorData_t</span><span class=w> </span><span class=o>&amp;</span><span class=n>sample</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>history</span><span class=p>[</span><span class=n>i</span><span class=p>];</span>
+<a id=__codelineno-16-8 name=__codelineno-16-8 href=#__codelineno-16-8></a><span class=w>    </span><span class=kt>float</span><span class=w> </span><span class=n>accel</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>sqrt</span><span class=p>(</span><span class=n>sample</span><span class=p>.</span><span class=n>accel_x</span><span class=o>*</span><span class=n>sample</span><span class=p>.</span><span class=n>accel_x</span><span class=w> </span><span class=o>+</span>
+<a id=__codelineno-16-9 name=__codelineno-16-9 href=#__codelineno-16-9></a><span class=w>                       </span><span class=n>sample</span><span class=p>.</span><span class=n>accel_y</span><span class=o>*</span><span class=n>sample</span><span class=p>.</span><span class=n>accel_y</span><span class=w> </span><span class=o>+</span>
+<a id=__codelineno-16-10 name=__codelineno-16-10 href=#__codelineno-16-10></a><span class=w>                       </span><span class=n>sample</span><span class=p>.</span><span class=n>accel_z</span><span class=o>*</span><span class=n>sample</span><span class=p>.</span><span class=n>accel_z</span><span class=p>);</span>
+<a id=__codelineno-16-11 name=__codelineno-16-11 href=#__codelineno-16-11></a><span class=w>    </span><span class=n>Serial</span><span class=p>.</span><span class=n>print</span><span class=p>(</span><span class=s>&quot;Sample &quot;</span><span class=p>);</span>
+<a id=__codelineno-16-12 name=__codelineno-16-12 href=#__codelineno-16-12></a><span class=w>    </span><span class=n>Serial</span><span class=p>.</span><span class=n>print</span><span class=p>(</span><span class=n>i</span><span class=p>);</span>
+<a id=__codelineno-16-13 name=__codelineno-16-13 href=#__codelineno-16-13></a><span class=w>    </span><span class=n>Serial</span><span class=p>.</span><span class=n>print</span><span class=p>(</span><span class=s>&quot;: &quot;</span><span class=p>);</span>
+<a id=__codelineno-16-14 name=__codelineno-16-14 href=#__codelineno-16-14></a><span class=w>    </span><span class=n>Serial</span><span class=p>.</span><span class=n>print</span><span class=p>(</span><span class=n>accel</span><span class=p>);</span>
+<a id=__codelineno-16-15 name=__codelineno-16-15 href=#__codelineno-16-15></a><span class=w>    </span><span class=n>Serial</span><span class=p>.</span><span class=n>println</span><span class=p>(</span><span class=s>&quot;g&quot;</span><span class=p>);</span>
+<a id=__codelineno-16-16 name=__codelineno-16-16 href=#__codelineno-16-16></a><span class=p>}</span>
+</code></pre></div> <div class="admonition info"> <p class=admonition-title>History Buffer</p> <ul> <li><strong>Size</strong>: 100 samples (10 seconds at 100Hz)</li> <li><strong>Resolution</strong>: ~100 bytes per sample</li> <li><strong>Total Memory</strong>: ~10 KB</li> <li><strong>Purpose</strong>: Replay detection window for debugging</li> </ul> </div> <h2 id=debug-output>Debug Output<a class=headerlink href=#debug-output title="Permanent link">&para;</a></h2> <p>Enable serial debug output for algorithm analysis:</p> <div class=highlight><pre><span></span><code><a id=__codelineno-17-1 name=__codelineno-17-1 href=#__codelineno-17-1></a><span class=c1>// In Config.h</span>
+<a id=__codelineno-17-2 name=__codelineno-17-2 href=#__codelineno-17-2></a><span class=cp>#define DEBUG_ALGORITHM_STEPS true</span>
+<a id=__codelineno-17-3 name=__codelineno-17-3 href=#__codelineno-17-3></a>
+<a id=__codelineno-17-4 name=__codelineno-17-4 href=#__codelineno-17-4></a><span class=c1>// Output example:</span>
+<a id=__codelineno-17-5 name=__codelineno-17-5 href=#__codelineno-17-5></a><span class=c1>// Stage 1 triggered: 15 pts (duration: 350ms, min accel: 0.15g)</span>
+<a id=__codelineno-17-6 name=__codelineno-17-6 href=#__codelineno-17-6></a><span class=c1>// Stage 2 triggered: 20 pts (impact: 4.5g, timing: 0.3s)</span>
+<a id=__codelineno-17-7 name=__codelineno-17-7 href=#__codelineno-17-7></a><span class=c1>// Stage 3 triggered: 15 pts (rotation: 380°/s, change: 85°)</span>
+<a id=__codelineno-17-8 name=__codelineno-17-8 href=#__codelineno-17-8></a><span class=c1>// Stage 4 triggered: 18 pts (inactivity: 2.5s)</span>
+<a id=__codelineno-17-9 name=__codelineno-17-9 href=#__codelineno-17-9></a><span class=c1>// Filter Score: 12 pts (HR spike: +8, Pressure: +4)</span>
+<a id=__codelineno-17-10 name=__codelineno-17-10 href=#__codelineno-17-10></a><span class=c1>// ─────────────────────────</span>
+<a id=__codelineno-17-11 name=__codelineno-17-11 href=#__codelineno-17-11></a><span class=c1>// TOTAL CONFIDENCE: 80 pts → HIGH_CONFIDENCE_FALL</span>
+</code></pre></div> <h2 id=integration-with-emergency-system>Integration with Emergency System<a class=headerlink href=#integration-with-emergency-system title="Permanent link">&para;</a></h2> <div class=highlight><pre><span></span><code><a id=__codelineno-18-1 name=__codelineno-18-1 href=#__codelineno-18-1></a><span class=c1>// When fall detected</span>
+<a id=__codelineno-18-2 name=__codelineno-18-2 href=#__codelineno-18-2></a><span class=k>if</span><span class=w> </span><span class=p>(</span><span class=n>fall_detector</span><span class=p>.</span><span class=n>getCurrentStatus</span><span class=p>()</span><span class=w> </span><span class=o>&gt;=</span><span class=w> </span><span class=n>CONFIRMED_FALL</span><span class=p>)</span><span class=w> </span><span class=p>{</span>
+<a id=__codelineno-18-3 name=__codelineno-18-3 href=#__codelineno-18-3></a><span class=w>    </span><span class=c1>// Create emergency payload</span>
+<a id=__codelineno-18-4 name=__codelineno-18-4 href=#__codelineno-18-4></a><span class=w>    </span><span class=n>EmergencyData_t</span><span class=w> </span><span class=n>alert</span><span class=p>;</span>
+<a id=__codelineno-18-5 name=__codelineno-18-5 href=#__codelineno-18-5></a><span class=w>    </span><span class=n>alert</span><span class=p>.</span><span class=n>confidence_score</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>fall_detector</span><span class=p>.</span><span class=n>getCurrentStatus</span><span class=p>();</span>
+<a id=__codelineno-18-6 name=__codelineno-18-6 href=#__codelineno-18-6></a><span class=w>    </span><span class=n>alert</span><span class=p>.</span><span class=n>timestamp</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>millis</span><span class=p>();</span>
+<a id=__codelineno-18-7 name=__codelineno-18-7 href=#__codelineno-18-7></a>
+<a id=__codelineno-18-8 name=__codelineno-18-8 href=#__codelineno-18-8></a><span class=w>    </span><span class=c1>// Include sensor history</span>
+<a id=__codelineno-18-9 name=__codelineno-18-9 href=#__codelineno-18-9></a><span class=w>    </span><span class=n>SensorData_t</span><span class=w> </span><span class=o>*</span><span class=n>history</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>fall_detector</span><span class=p>.</span><span class=n>getSensorHistory</span><span class=p>();</span>
+<a id=__codelineno-18-10 name=__codelineno-18-10 href=#__codelineno-18-10></a><span class=w>    </span><span class=n>alert</span><span class=p>.</span><span class=n>sensor_count</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>fall_detector</span><span class=p>.</span><span class=n>getHistoryCount</span><span class=p>();</span>
+<a id=__codelineno-18-11 name=__codelineno-18-11 href=#__codelineno-18-11></a>
+<a id=__codelineno-18-12 name=__codelineno-18-12 href=#__codelineno-18-12></a><span class=w>    </span><span class=c1>// Send alert</span>
+<a id=__codelineno-18-13 name=__codelineno-18-13 href=#__codelineno-18-13></a><span class=w>    </span><span class=n>emergency_comms</span><span class=p>.</span><span class=n>sendAlert</span><span class=p>(</span><span class=n>alert</span><span class=p>);</span>
+<a id=__codelineno-18-14 name=__codelineno-18-14 href=#__codelineno-18-14></a>
+<a id=__codelineno-18-15 name=__codelineno-18-15 href=#__codelineno-18-15></a><span class=w>    </span><span class=c1>// Reset for next detection</span>
+<a id=__codelineno-18-16 name=__codelineno-18-16 href=#__codelineno-18-16></a><span class=w>    </span><span class=n>fall_detector</span><span class=p>.</span><span class=n>resetDetection</span><span class=p>();</span>
+<a id=__codelineno-18-17 name=__codelineno-18-17 href=#__codelineno-18-17></a><span class=p>}</span>
 </code></pre></div> <h2 id=next-steps>Next Steps<a class=headerlink href=#next-steps title="Permanent link">&para;</a></h2> <ol> <li><strong>Confidence Scoring Details</strong>: See <a href=../../algorithm/confidence-scoring/ >Confidence Scoring</a></li> <li><strong>Communication</strong>: See <a href=../communication/ >Communication System</a></li> <li><strong>Testing</strong>: See <a href=../../testing/fall-simulation/ >Fall Simulation Tests</a></li> <li><strong>Configuration</strong>: See <a href=../../configuration/config-reference/ >Config Reference</a></li> </ol> </article> </div> <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var tab,labels=set.querySelector(".tabbed-labels");for(tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script> <script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script> </div> <button type=button class="md-top md-icon" data-md-component=top hidden> <svg xmlns=http://www.w3.org/2000/svg viewbox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8v12Z"/></svg> Back to top </button> </main> <footer class=md-footer> <div class="md-footer-meta md-typeset"> <div class="md-footer-meta__inner md-grid"> <div class=md-copyright> Made with <a href=https://squidfunk.github.io/mkdocs-material/ target=_blank rel=noopener> Material for MkDocs </a> </div> </div> </div> </footer> </div> <div class=md-dialog data-md-component=dialog> <div class="md-dialog__inner md-typeset"></div> </div> <script id=__config type=application/json>{"base": "../..", "features": ["navigation.tabs", "navigation.tabs.sticky", "navigation.sections", "navigation.top", "search.suggest", "search.highlight", "content.code.copy", "content.tabs.link", "toc.follow"], "search": "../../assets/javascripts/workers/search.b8dbb3d2.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script> <script src=../../assets/javascripts/bundle.3220b9d7.min.js></script> </body> </html>
