@@ -5,4 +5,5 @@
 .vscode/ipch
 compile_all.log
 .vscode
-binsite/
+site/
+SmartFall_logo.png
