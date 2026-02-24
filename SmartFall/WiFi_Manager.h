@@ -3,6 +3,7 @@
 
 #include <WiFi.h>
 #include <HTTPClient.h>
+#include <WiFiClientSecure.h>
 #include <Arduino.h>
 #include "Data_Types.h"
 
@@ -18,6 +19,7 @@ private:
     unsigned long pingInterval;
     bool autoReconnect;
     bool initialized;
+    WiFiClientSecure secureClient;
 
 public:
     WiFiManager();

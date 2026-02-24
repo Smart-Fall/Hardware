@@ -1,5 +1,6 @@
 #include "WiFi_Manager.h"
 #include <ArduinoJson.h>
+#include <WiFiClientSecure.h>
 
 WiFiManager::WiFiManager()
 {
@@ -107,7 +108,8 @@ bool WiFiManager::sendTestMessage(const String &message)
     }
 
     HTTPClient http;
-    http.begin(serverURL);
+    secureClient.setInsecure();
+    http.begin(secureClient, serverURL);
     http.addHeader("Content-Type", "text/plain");
 
     Serial.print("Sending test message to: ");
@@ -149,7 +151,8 @@ bool WiFiManager::sendJSON(const String &jsonPayload)
     }
 
     HTTPClient http;
-    http.begin(serverURL);
+    secureClient.setInsecure();
+    http.begin(secureClient, serverURL);
     http.addHeader("Content-Type", "application/json");
 
     Serial.println("Sending JSON payload:");
@@ -244,7 +247,8 @@ bool WiFiManager::sendEmergencyAlert(const EmergencyData_t &emergency_data)
     String endpoint = getEndpointURL("/api/falls");
 
     HTTPClient http;
-    http.begin(endpoint);
+    secureClient.setInsecure();
+    http.begin(secureClient, endpoint);
     http.addHeader("Content-Type", "application/json");
 
     Serial.println("[WiFi] Sending emergency alert to: " + endpoint);
@@ -291,7 +295,8 @@ bool WiFiManager::sendStatusUpdate(const SystemStatus_t &status_data)
     String endpoint = getEndpointURL("/api/device/status");
 
     HTTPClient http;
-    http.begin(endpoint);
+    secureClient.setInsecure();
+    http.begin(secureClient, endpoint);
     http.addHeader("Content-Type", "application/json");
     http.addHeader("X-Device-ID", WiFi.macAddress());
 
@@ -310,6 +315,7 @@ bool WiFiManager::sendSensorData(const SensorData_t &sensor_data)
     }
 
     DynamicJsonDocument doc(512);
+    doc["device_id"] = "SF-" + WiFi.macAddress();
     doc["accel_x"] = sensor_data.accel_x;
     doc["accel_y"] = sensor_data.accel_y;
     doc["accel_z"] = sensor_data.accel_z;
@@ -324,7 +330,8 @@ bool WiFiManager::sendSensorData(const SensorData_t &sensor_data)
     String endpoint = getEndpointURL("/api/device/sensor-stream");
 
     HTTPClient http;
-    http.begin(endpoint);
+    secureClient.setInsecure();
+    http.begin(secureClient, endpoint);
     http.addHeader("Content-Type", "application/json");
     http.addHeader("X-Device-ID", WiFi.macAddress());
 
@@ -360,7 +367,8 @@ bool WiFiManager::pingServer()
     String endpoint = getEndpointURL("/api/health");
 
     HTTPClient http;
-    http.begin(endpoint);
+    secureClient.setInsecure();
+    http.begin(secureClient, endpoint);
     http.setTimeout(5000); // 5 second timeout
 
     Serial.print("[WiFi] Pinging server: ");
@@ -404,7 +412,8 @@ bool WiFiManager::testServerConnection()
     String endpoint = getEndpointURL("/api/health");
 
     HTTPClient http;
-    http.begin(endpoint);
+    secureClient.setInsecure();
+    http.begin(secureClient, endpoint);
     http.addHeader("Content-Type", "application/json");
     http.addHeader("X-Device-ID", WiFi.macAddress());
     http.setTimeout(5000);
@@ -485,7 +494,8 @@ void WiFiManager::checkAndPing()
         HTTPClient http;
         String endpoint = getEndpointURL("/api/device/status");
 
-        http.begin(endpoint);
+        secureClient.setInsecure();
+        http.begin(secureClient, endpoint);
         http.addHeader("Content-Type", "application/json");
         http.addHeader("X-Device-ID", WiFi.macAddress());
         http.setTimeout(3000);

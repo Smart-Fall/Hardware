@@ -39,8 +39,8 @@
 #define WIFI_MAX_RECONNECT_ATTEMPTS 5
 
 // Server Configuration
-#define SERVER_URL "http://10.129.112.75:3000" // Your alert server URL
-#define SERVER_PORT 3000
+#define SERVER_URL "https://smartfall.vercel.app" // Your alert server URL
+#define SERVER_PORT 443
 
 // BLE Configuration
 #define BLE_DEVICE_NAME "SmartFall"
