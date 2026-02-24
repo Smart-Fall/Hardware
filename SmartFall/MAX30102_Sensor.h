@@ -3,42 +3,60 @@
 
 #include <Arduino.h>
 #include <Wire.h>
-#include <MAX30105.h>
-#include <heartRate.h>
-#include "utils/config.h"
+#include <HardwareSerial.h>
+#include <DFRobot_BloodOxygen_S.h>
+#include "Utils/Config.h"
 
-class MAX30102_Sensor {
+class MAX30102Sensor
+{
 private:
-    MAX30105 particleSensor;
+    #ifdef MAX30102_USE_UART
+        DFRobot_BloodOxygen_S_HardWareUart heartRateSensor;
+        uint8_t rx_pin;
+        uint8_t tx_pin;
+    #else
+        DFRobot_BloodOxygen_S_I2C heartRateSensor;
+        uint8_t sda_pin;
+        uint8_t scl_pin;
+    #endif
     bool initialized;
-    uint8_t sda_pin;
-    uint8_t scl_pin;
-    uint8_t rst_pin;
 
-    const byte RATE_SIZE = 4;
-    byte rates[4];
-    byte rateSpot;
-    long lastBeat;
-    float beatsPerMinute;
-    int beatAvg;
+    // Data buffering for stability
+    uint16_t heart_rate_buffer[5];
+    uint8_t spo2_buffer[5];
+    uint8_t buffer_index;
+    uint32_t last_read_time;
+
+    // Baseline values for change detection
+    uint16_t baseline_heart_rate;
+    uint8_t baseline_spo2;
+    bool baseline_set;
 
 public:
-    MAX30102_Sensor(uint8_t sda = MAX30102_SDA_PIN, uint8_t scl = MAX30102_SCL_PIN, uint8_t rst = MAX30102_RST_PIN);
+    #ifdef MAX30102_USE_UART
+        MAX30102Sensor(uint8_t rx = 255, uint8_t tx = 255);
+    #else
+        MAX30102Sensor(uint8_t sda = 22, uint8_t scl = 20);
+    #endif
 
-    bool begin();
-    void configure(byte ledBrightness = 60,
-                   byte sampleAverage = 4,
-                   byte ledMode = 2,
-                   int sampleRate = 100,
-                   int pulseWidth = 411,
-                   int adcRange = 4096);
+    bool begin(uint8_t address = 0x57);
+    void configure();
 
-    bool readHeartRate(float &bpm, bool &finger_detected);
-    long getIRValue();
+    bool readData(uint16_t &heart_rate, uint8_t &spo2, float &temperature);
+    bool getRawData(uint16_t &heart_rate, uint8_t &spo2);
+    float getTemperature();
+
+    void setBaselineHeartRate(uint16_t baseline);
+    void setBaselineSPO2(uint8_t baseline);
+    uint16_t getBaselineHeartRate();
+    uint8_t getBaselineSPO2();
+
+    void resetBaseline();
+    void startCollection();
+    void stopCollection();
 
     bool isInitialized();
     void printInfo();
 };
 
 #endif
-

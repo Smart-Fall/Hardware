@@ -1,155 +1,118 @@
 #include "Audio_Manager.h"
 
-Audio_Manager::Audio_Manager(uint8_t pin)
-    : speaker_pin(pin), initialized(false), muted(false), volume_level(80),
-      playing(false), pattern_start_time(0), current_pattern(ALERT_PATTERN_SINGLE_BEEP),
-      pwm_channel(0), pwm_frequency(5000), pwm_resolution(8)
+AudioManager::AudioManager(uint8_t pin)
 {
+    speakerPin = pin;
+    pwmChannel = 0; // Use PWM channel 0
+    volume = 80;    // Default 80%
+    initialized = false;
 }
 
-Audio_Manager::~Audio_Manager()
+bool AudioManager::begin()
 {
-    end();
-}
-
-bool Audio_Manager::begin()
-{
-    if (initialized)
-    {
-        Serial.println("[Audio] Already initialized");
-        return true;
-    }
-
-    // Configure PWM for audio output (ESP32 core 3.x API)
-    ledcAttach(speaker_pin, pwm_frequency, pwm_resolution);
-    ledcWrite(speaker_pin, 0); // Start silent
-
-    pinMode(speaker_pin, OUTPUT);
-    digitalWrite(speaker_pin, LOW);
+    // Configure PWM for audio output (ESP32 v3.x API)
+    ledcAttach(speakerPin, 5000, 8); // pin, freq (5kHz), resolution (8-bit)
+    ledcWrite(speakerPin, 0);        // Start silent
 
     initialized = true;
-    Serial.println("[Audio] PAM8302 amplifier initialized");
-
+    Serial.println("Audio Manager initialized (PAM8302)");
     return true;
 }
 
-void Audio_Manager::end()
+bool AudioManager::isInitialized()
 {
-    if (initialized)
-    {
-        stopTone();
-        ledcDetach(speaker_pin);
-        initialized = false;
-        Serial.println("[Audio] Audio system stopped");
-    }
+    return initialized;
 }
 
-void Audio_Manager::setVolume(uint8_t level)
+void AudioManager::setVolume(uint8_t level)
 {
-    volume_level = constrain(level, 0, 100);
-    if (DEBUG_COMMUNICATION)
-    {
-        Serial.print("[Audio] Volume set to: ");
-        Serial.print(volume_level);
-        Serial.println("%");
-    }
+    volume = constrain(level, 0, 100);
+    Serial.print("Volume set to: ");
+    Serial.print(volume);
+    Serial.println("%");
 }
 
-uint8_t Audio_Manager::getVolume()
+uint8_t AudioManager::getVolume()
 {
-    return volume_level;
+    return volume;
 }
 
-void Audio_Manager::mute()
+void AudioManager::playToneInternal(uint16_t frequency, uint32_t duration_ms)
 {
-    muted = true;
-    if (playing)
-    {
-        toneOff();
-    }
-    if (DEBUG_COMMUNICATION)
-    {
-        Serial.println("[Audio] Muted");
-    }
-}
-
-void Audio_Manager::unmute()
-{
-    muted = false;
-    if (DEBUG_COMMUNICATION)
-    {
-        Serial.println("[Audio] Unmuted");
-    }
-}
-
-bool Audio_Manager::isMuted()
-{
-    return muted;
-}
-
-void Audio_Manager::playTone(uint16_t frequency, uint32_t duration_ms)
-{
-    playTone(frequency, duration_ms, volume_level);
-}
-
-void Audio_Manager::playTone(uint16_t frequency, uint32_t duration_ms, uint8_t volume)
-{
-    if (!initialized || muted)
+    if (!initialized || frequency == 0)
         return;
 
-    toneOn(frequency, volume);
+    // Calculate duty cycle based on volume (0-255 for 8-bit)
+    uint8_t dutyCycle = map(volume, 0, 100, 0, 128); // Max 50% duty cycle for square wave
+
+    ledcWriteTone(speakerPin, frequency);
+    ledcWrite(speakerPin, dutyCycle);
     delay(duration_ms);
-    toneOff();
+    ledcWrite(speakerPin, 0); // Silence
 }
 
-void Audio_Manager::stopTone()
+void AudioManager::playTone(uint16_t frequency, uint32_t duration_ms)
 {
-    toneOff();
-    playing = false;
+    playToneInternal(frequency, duration_ms);
 }
 
-void Audio_Manager::playPattern(AlertPattern_t pattern)
+void AudioManager::playTones(uint16_t *frequencies, uint32_t *durations, uint8_t count)
 {
-    playPattern(pattern, 1);
+    for (uint8_t i = 0; i < count; i++)
+    {
+        playToneInternal(frequencies[i], durations[i]);
+        delay(50); // Small gap between tones
+    }
 }
 
-void Audio_Manager::playPattern(AlertPattern_t pattern, uint8_t repetitions)
+void AudioManager::playPattern(AlertPattern_t pattern, uint8_t repeat)
 {
-    if (!initialized || muted)
-        return;
-
-    current_pattern = pattern;
-    playing = true;
-
-    for (uint8_t i = 0; i < repetitions; i++)
+    for (uint8_t r = 0; r < repeat; r++)
     {
         switch (pattern)
         {
         case ALERT_PATTERN_SINGLE_BEEP:
-            playSingleBeep();
+            playToneInternal(1000, 300);
             break;
 
         case ALERT_PATTERN_DOUBLE_BEEP:
-            playDoubleBeep();
+            playToneInternal(1000, 200);
+            delay(100);
+            playToneInternal(1000, 200);
             break;
 
         case ALERT_PATTERN_TRIPLE_BEEP:
-            playTripleBeep();
-            break;
-
-        case ALERT_PATTERN_CONTINUOUS:
-            playContinuousTone();
+            playToneInternal(1000, 150);
+            delay(100);
+            playToneInternal(1000, 150);
+            delay(100);
+            playToneInternal(1000, 150);
             break;
 
         case ALERT_PATTERN_SIREN:
-            playSiren();
+            for (uint16_t freq = 500; freq <= 2000; freq += 50)
+            {
+                playToneInternal(freq, 30);
+            }
+            for (uint16_t freq = 2000; freq >= 500; freq -= 50)
+            {
+                playToneInternal(freq, 30);
+            }
             break;
 
         case ALERT_PATTERN_URGENT:
-            playUrgentBeeps();
+            for (int i = 0; i < 5; i++)
+            {
+                playToneInternal(2000, 100);
+                delay(50);
+            }
             break;
 
-        case ALERT_PATTERN_CONFIRMED:
+        case ALERT_PATTERN_SOS:
+            playSOSSequence();
+            break;
+
+        case ALERT_PATTERN_CONFIRMATION:
             playConfirmationTone();
             break;
 
@@ -157,412 +120,187 @@ void Audio_Manager::playPattern(AlertPattern_t pattern, uint8_t repetitions)
             playErrorTone();
             break;
 
-        case ALERT_PATTERN_STARTUP:
-            playStartupMelody();
-            break;
-
-        case ALERT_PATTERN_FALL_DETECTED:
-            playFallDetectedSequence();
-            break;
-
-        case ALERT_PATTERN_SOS:
-            playSOSSequence();
+        case ALERT_PATTERN_WARNING:
+            playWarningTone();
             break;
 
         case ALERT_PATTERN_CANCEL:
-            playFallingTone(1000, 500, 300);
+            // Descending tone pattern to indicate cancellation
+            playToneInternal(800, 100);
+            delay(50);
+            playToneInternal(600, 200);
             break;
         }
 
-        if (i < repetitions - 1)
+        if (r < repeat - 1)
         {
-            delay(500); // Pause between repetitions
+            delay(500); // Delay between repetitions
         }
     }
-
-    playing = false;
 }
 
-void Audio_Manager::stopPattern()
+void AudioManager::playConfirmationTone()
 {
-    playing = false;
-    stopTone();
-}
-
-bool Audio_Manager::isPlaying()
-{
-    return playing;
-}
-
-void Audio_Manager::playVoiceAlert(VoiceAlert_t alert)
-{
-    playVoiceAlert(alert, 1);
-}
-
-void Audio_Manager::playVoiceAlert(VoiceAlert_t alert, uint8_t repetitions)
-{
-    if (!initialized || muted)
-        return;
-
-    playing = true;
-
-    for (uint8_t i = 0; i < repetitions; i++)
-    {
-        switch (alert)
-        {
-        case VOICE_ALERT_FALL_DETECTED:
-            // "Fall" (falling tone) + "Detected" (rising tone)
-            playFallingTone(800, 400, 300);
-            delay(100);
-            playRisingTone(400, 800, 300);
-            delay(200);
-            playShortTone(1000, 200); // Emphasis
-            break;
-
-        case VOICE_ALERT_PRESS_BUTTON:
-            // "Press" + "Button" + "If" + "Okay"
-            playShortTone(600, 150);
-            delay(80);
-            playShortTone(700, 150);
-            delay(150);
-            playShortTone(500, 100);
-            delay(80);
-            playLongTone(600, 250);
-            break;
-
-        case VOICE_ALERT_CALLING_HELP:
-            // "Calling" (ascending) + "Help" (urgent)
-            playRisingTone(500, 1000, 400);
-            delay(150);
-            playShortTone(1500, 200);
-            delay(100);
-            playShortTone(1500, 200);
-            break;
-
-        case VOICE_ALERT_HELP_SENT:
-            // "Help" + "Sent" (confirmation)
-            playShortTone(800, 150);
-            delay(100);
-            playRisingTone(800, 1200, 250);
-            break;
-
-        case VOICE_ALERT_SYSTEM_READY:
-            // "System" + "Ready" (positive ascending)
-            playShortTone(600, 150);
-            delay(80);
-            playShortTone(700, 150);
-            delay(150);
-            playRisingTone(700, 1000, 300);
-            break;
-
-        case VOICE_ALERT_LOW_BATTERY:
-            // "Low" (descending) + "Battery" (repeated warning)
-            playFallingTone(800, 400, 300);
-            delay(150);
-            playShortTone(500, 150);
-            delay(100);
-            playShortTone(500, 150);
-            delay(100);
-            playShortTone(500, 150);
-            break;
-
-        case VOICE_ALERT_CONNECTION_LOST:
-            // "Connection" + "Lost" (falling)
-            playShortTone(700, 150);
-            delay(80);
-            playShortTone(650, 150);
-            delay(80);
-            playFallingTone(600, 300, 400);
-            break;
-
-        case VOICE_ALERT_COUNTDOWN:
-            playCountdownBeeps(5);
-            break;
-        }
-
-        if (i < repetitions - 1)
-        {
-            delay(800); // Pause between repetitions
-        }
-    }
-
-    playing = false;
-}
-
-void Audio_Manager::playStartupMelody()
-{
-    // Ascending scale to indicate system ready
-    playShortTone(523, 150); // C
+    playToneInternal(1000, 100);
     delay(50);
-    playShortTone(659, 150); // E
-    delay(50);
-    playShortTone(784, 150); // G
-    delay(50);
-    playLongTone(1047, 300); // C (octave higher)
+    playToneInternal(1500, 100);
 }
 
-void Audio_Manager::playConfirmationTone()
+void AudioManager::playErrorTone()
 {
-    // Ascending two-note confirmation
-    playShortTone(800, 100);
-    delay(50);
-    playShortTone(1200, 200);
+    playToneInternal(400, 200);
+    delay(100);
+    playToneInternal(300, 300);
 }
 
-void Audio_Manager::playErrorTone()
+void AudioManager::playWarningTone()
 {
-    // Descending two-note error
-    playShortTone(800, 150);
-    delay(50);
-    playShortTone(400, 300);
-}
-
-void Audio_Manager::playWarningTone()
-{
-    // Alternating warning beeps
     for (int i = 0; i < 3; i++)
     {
-        playShortTone(1000, 150);
+        playToneInternal(800, 200);
         delay(100);
     }
 }
 
-void Audio_Manager::playSirenSound()
+void AudioManager::playSOSSequence()
 {
-    // Alternating high/low siren
+    // S: ... (3 short)
     for (int i = 0; i < 3; i++)
     {
-        playSweep(800, 1500, 500, 1);  // Rising
-        playSweep(1500, 800, 500, -1); // Falling
-    }
-}
-
-void Audio_Manager::playFallDetectedSequence()
-{
-    // Urgent three-tone sequence
-    playShortTone(1500, 200);
-    delay(150);
-    playShortTone(1500, 200);
-    delay(150);
-    playLongTone(1500, 400);
-    delay(300);
-
-    // Voice-like "Fall Detected"
-    playVoiceAlert(VOICE_ALERT_FALL_DETECTED);
-}
-
-void Audio_Manager::playSOSSequence()
-{
-    // SOS in Morse code: ... --- ...
-    // Three short beeps
-    for (int i = 0; i < 3; i++)
-    {
-        playShortTone(1500, 150);
-        delay(150);
+        playToneInternal(1000, 200);
+        delay(100);
     }
     delay(300);
 
-    // Three long beeps
+    // O: --- (3 long)
     for (int i = 0; i < 3; i++)
     {
-        playLongTone(1500, 400);
-        delay(150);
+        playToneInternal(1000, 600);
+        delay(100);
     }
     delay(300);
 
-    // Three short beeps
+    // S: ... (3 short)
     for (int i = 0; i < 3; i++)
     {
-        playShortTone(1500, 150);
-        delay(150);
-    }
-}
-
-void Audio_Manager::playCountdownBeeps(uint8_t count)
-{
-    for (uint8_t i = 0; i < count; i++)
-    {
-        // Higher pitch for final beep
-        uint16_t freq = (i == count - 1) ? 1500 : 1000;
-        playShortTone(freq, 200);
-        delay(800); // 1 second between beeps
-    }
-}
-
-bool Audio_Manager::isInitialized()
-{
-    return initialized;
-}
-
-void Audio_Manager::test()
-{
-    if (!initialized || muted)
-        return;
-
-    Serial.println("[Audio] Testing all patterns...");
-
-    Serial.println("  - Single Beep");
-    playPattern(ALERT_PATTERN_SINGLE_BEEP);
-    delay(500);
-
-    Serial.println("  - Double Beep");
-    playPattern(ALERT_PATTERN_DOUBLE_BEEP);
-    delay(500);
-
-    Serial.println("  - Triple Beep");
-    playPattern(ALERT_PATTERN_TRIPLE_BEEP);
-    delay(500);
-
-    Serial.println("  - Confirmation Tone");
-    playConfirmationTone();
-    delay(500);
-
-    Serial.println("  - Error Tone");
-    playErrorTone();
-    delay(500);
-
-    Serial.println("  - Startup Melody");
-    playStartupMelody();
-    delay(500);
-
-    Serial.println("  - Fall Detected Sequence");
-    playFallDetectedSequence();
-    delay(1000);
-
-    Serial.println("  - SOS Sequence");
-    playSOSSequence();
-    delay(1000);
-
-    Serial.println("[Audio] Test complete");
-}
-
-// Private helper functions
-
-void Audio_Manager::toneOn(uint16_t frequency)
-{
-    toneOn(frequency, volume_level);
-}
-
-void Audio_Manager::toneOn(uint16_t frequency, uint8_t volume)
-{
-    if (!initialized || muted)
-        return;
-
-    // Use ESP32 LED PWM for tone generation (ESP32 core 3.x API)
-    ledcChangeFrequency(speaker_pin, frequency, pwm_resolution);
-    uint8_t duty = scaleVolume(volume);
-    ledcWrite(speaker_pin, duty);
-}
-
-void Audio_Manager::toneOff()
-{
-    if (!initialized)
-        return;
-    ledcWrite(speaker_pin, 0);
-}
-
-void Audio_Manager::playSingleBeep()
-{
-    playShortTone(TONE_MEDIUM_FREQ, 200);
-}
-
-void Audio_Manager::playDoubleBeep()
-{
-    playShortTone(TONE_MEDIUM_FREQ, 150);
-    delay(150);
-    playShortTone(TONE_MEDIUM_FREQ, 150);
-}
-
-void Audio_Manager::playTripleBeep()
-{
-    for (int i = 0; i < 3; i++)
-    {
-        playShortTone(TONE_MEDIUM_FREQ, 150);
-        delay(150);
-    }
-}
-
-void Audio_Manager::playContinuousTone()
-{
-    playLongTone(TONE_HIGH_FREQ, 2000);
-}
-
-void Audio_Manager::playSiren()
-{
-    for (int i = 0; i < 5; i++)
-    {
-        playSweep(600, 1200, 300, 1);
-        playSweep(1200, 600, 300, -1);
-    }
-}
-
-void Audio_Manager::playUrgentBeeps()
-{
-    for (int i = 0; i < 5; i++)
-    {
-        playShortTone(TONE_URGENT_FREQ, 100);
+        playToneInternal(1000, 200);
         delay(100);
     }
 }
 
-void Audio_Manager::playShortTone(uint16_t freq, uint32_t duration)
+void AudioManager::playStartupMelody()
 {
-    playTone(freq, duration);
-}
-
-void Audio_Manager::playLongTone(uint16_t freq, uint32_t duration)
-{
-    playTone(freq, duration);
-}
-
-void Audio_Manager::playRisingTone(uint16_t start_freq, uint16_t end_freq, uint32_t duration)
-{
-    playSweep(start_freq, end_freq, duration, 1);
-}
-
-void Audio_Manager::playFallingTone(uint16_t start_freq, uint16_t end_freq, uint32_t duration)
-{
-    playSweep(start_freq, end_freq, duration, -1);
-}
-
-void Audio_Manager::playSweep(uint16_t start_freq, uint16_t end_freq, uint32_t duration, int8_t direction)
-{
-    if (!initialized || muted)
-        return;
-
-    uint32_t start_time = millis();
-    uint32_t step_time = 10; // Update frequency every 10ms
-
-    while (millis() - start_time < duration)
+    uint16_t frequencies[] = {523, 587, 659, 698, 784}; // C, D, E, F, G
+    for (int i = 0; i < 5; i++)
     {
-        float progress = (float)(millis() - start_time) / duration;
-        uint16_t current_freq = start_freq + (end_freq - start_freq) * progress;
-
-        toneOn(current_freq);
-        delay(step_time);
-    }
-
-    toneOff();
-}
-
-void Audio_Manager::delayWithStop(uint32_t ms)
-{
-    uint32_t start = millis();
-    while (millis() - start < ms)
-    {
-        if (!playing)
-        {
-            break;
-        }
-        delay(10);
+        playToneInternal(frequencies[i], 150);
+        delay(50);
     }
 }
 
-uint8_t Audio_Manager::scaleVolume(uint8_t volume)
+void AudioManager::playFallDetectedSequence()
 {
-    // Convert 0-100 volume to PWM duty cycle (0-255)
-    // Apply logarithmic scaling for more natural volume curve
-    float normalized = volume / 100.0;
-    float scaled = pow(normalized, 2.0); // Square for logarithmic feel
-    return (uint8_t)(scaled * 255);
+    // Urgent ascending pattern
+    for (int i = 0; i < 3; i++)
+    {
+        playToneInternal(800, 200);
+        playToneInternal(1200, 200);
+        playToneInternal(1600, 200);
+        delay(200);
+    }
+}
+
+void AudioManager::playVoiceAlert(VoiceAlert_t alert)
+{
+    // Voice-like patterns using tone variations
+    // These patterns mimic speech prosody with varying frequencies and durations
+
+    switch (alert)
+    {
+    case VOICE_ALERT_FALL_DETECTED:
+        // "Fall Detected" - 2 words
+        // "Fall" - descending
+        playToneInternal(800, 150);
+        playToneInternal(600, 200);
+        delay(100);
+        // "De-tec-ted" - 3 syllables
+        playToneInternal(700, 120);
+        playToneInternal(900, 120);
+        playToneInternal(600, 180);
+        break;
+
+    case VOICE_ALERT_PRESS_BUTTON:
+        // "Press Button" - 2 words
+        // "Press" - rising
+        playToneInternal(600, 180);
+        delay(80);
+        // "But-ton" - 2 syllables
+        playToneInternal(700, 150);
+        playToneInternal(650, 180);
+        break;
+
+    case VOICE_ALERT_CALLING_HELP:
+        // "Calling Help" - 2 words
+        // "Call-ing" - 2 syllables
+        playToneInternal(750, 150);
+        playToneInternal(700, 150);
+        delay(100);
+        // "Help" - emphasized
+        playToneInternal(900, 250);
+        break;
+
+    case VOICE_ALERT_HELP_SENT:
+        // "Help Sent" - 2 words
+        // "Help" - rising
+        playToneInternal(700, 180);
+        delay(80);
+        // "Sent" - falling
+        playToneInternal(800, 120);
+        playToneInternal(650, 180);
+        break;
+
+    case VOICE_ALERT_SYSTEM_READY:
+        // "System Ready" - 2 words
+        // "Sys-tem" - 2 syllables
+        playToneInternal(650, 120);
+        playToneInternal(700, 120);
+        delay(100);
+        // "Read-y" - 2 syllables, rising
+        playToneInternal(750, 150);
+        playToneInternal(850, 180);
+        break;
+
+    case VOICE_ALERT_LOW_BATTERY:
+        // "Low Battery" - 3 syllables
+        // "Low"
+        playToneInternal(600, 180);
+        delay(80);
+        // "Bat-ter-y" - 3 syllables
+        playToneInternal(650, 120);
+        playToneInternal(700, 120);
+        playToneInternal(550, 200);
+        break;
+
+    case VOICE_ALERT_CONNECTION_LOST:
+        // "Connection Lost" - 4 syllables
+        // "Con-nec-tion"
+        playToneInternal(700, 100);
+        playToneInternal(750, 100);
+        playToneInternal(700, 120);
+        delay(80);
+        // "Lost" - falling
+        playToneInternal(650, 120);
+        playToneInternal(500, 180);
+        break;
+    }
+}
+
+void AudioManager::stopPattern()
+{
+    ledcWrite(speakerPin, 0);
+}
+
+void AudioManager::silence()
+{
+    ledcWrite(speakerPin, 0);
 }

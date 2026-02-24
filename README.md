@@ -26,6 +26,7 @@ A comprehensive IoT solution for real-time fall detection using multi-sensor dat
 ### Arduino CLI Setup (Recommended)
 
 #### Linux/Ubuntu Installation
+
 ```bash
 # Install Arduino CLI
 curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | sh
@@ -35,7 +36,7 @@ export PATH=$PATH:$HOME/bin
 arduino-cli config init
 arduino-cli core update-index
 arduino-cli core install esp32:esp32
-arduino-cli lib install "Adafruit MPU6050" "Adafruit BMP280 Library" "SparkFun MAX3010x Pulse and Proximity Sensor Library" "Adafruit Unified Sensor" "ArduinoJson"
+arduino-cli lib install "Adafruit MPU6050" "Adafruit BMP280 Library" "SparkFun MAX3010x Pulse and Proximity Sensor Library" "Adafruit Unified Sensor" "DFRobot_BloodOxygen_S" "DFRobot_RTU" "ArduinoJson"
 
 # Fix serial port permissions
 sudo usermod -a -G dialout $USER
@@ -43,6 +44,7 @@ sudo usermod -a -G dialout $USER
 ```
 
 #### Windows PowerShell Installation
+
 ```powershell
 # Download and install
 Invoke-WebRequest -Uri "https://downloads.arduino.cc/arduino-cli/arduino-cli_latest_Windows_64bit.zip" -OutFile "$env:TEMP\arduino-cli.zip"
@@ -53,14 +55,13 @@ Expand-Archive -Path "$env:TEMP\arduino-cli.zip" -DestinationPath "C:\arduino-cl
 arduino-cli config init
 arduino-cli core update-index
 arduino-cli core install esp32:esp32
-arduino-cli lib install "Adafruit MPU6050" "Adafruit BMP280 Library" \
-  "SparkFun MAX3010x Pulse and Proximity Sensor Library" \
-  "Adafruit Unified Sensor" "ArduinoJson"
+arduino-cli lib install "Adafruit MPU6050" "Adafruit BMP280 Library" "SparkFun MAX3010x Pulse and Proximity Sensor Library" "Adafruit Unified Sensor" "DFRobot_BloodOxygen_S" "DFRobot_RTU" "ArduinoJson"
 ```
 
 ### Build and Upload
 
 #### For ESP32 HUZZAH32 Feather (Original)
+
 ```bash
 cd SmartFall
 
@@ -78,6 +79,7 @@ arduino-cli monitor -p PORT -c baudrate=115200
 ```
 
 #### For ESP32 Feather V2 (USB-C, 8MB Flash, 2MB PSRAM)
+
 ```bash
 cd SmartFall
 
@@ -95,6 +97,7 @@ arduino-cli monitor -p PORT -c baudrate=115200
 ```
 
 **Port Configuration:**
+
 - Edit `SmartFall/sketch.yaml` to set your default port
 - Linux: `/dev/ttyUSB0` or `/dev/ttyACM0`
 - Windows: `COM3` (check Device Manager)
@@ -106,7 +109,9 @@ arduino-cli monitor -p PORT -c baudrate=115200
 ### Required Components
 
 #### Microcontroller (Choose One)
+
 - **ESP32 Feather V2** (Adafruit #5400)
+
   - USB Type-C
   - 8MB Flash (double the original)
   - 2MB PSRAM (new addition)
@@ -124,6 +129,7 @@ arduino-cli monitor -p PORT -c baudrate=115200
 **Note:** Both boards are fully compatible with this project. Choose based on availability and features needed.
 
 #### Sensors & Components
+
 - **MPU6050** - 6-axis IMU (accelerometer + gyroscope) - I2C
 - **BMP280** - Barometric pressure sensor - I2C
 - **MAX30102** - Heart rate sensor - I2C
@@ -134,6 +140,7 @@ arduino-cli monitor -p PORT -c baudrate=115200
 - **LEDs** - Visual alert indicators
 
 ### Optional Components
+
 - **Haptic motor** - Vibration feedback
 - **OLED display** - System status display
 - **Battery** - LiPo battery for portable operation (JST connector on both boards)
@@ -143,16 +150,19 @@ arduino-cli monitor -p PORT -c baudrate=115200
 ## 📊 System Architecture
 
 ### 5-Stage Fall Detection Algorithm
+
 ```
-Stage 1: Free Fall Detection  → 25 points max
-Stage 2: Impact Analysis      → 25 points max
-Stage 3: Rotation Assessment  → 20 points max
-Stage 4: Inactivity Check     → 20 points max
-Stage 5: False Positive Filters → 15 points max
+Stage 1: Free Fall Detection       → 25 points max
+Stage 2: Impact Analysis          → 25 points max
+Stage 3: Rotation Assessment      → 20 points max
+Stage 4: Inactivity Check         → 20 points max
+Stage 5: False Positive Filters   → 15 points max
+         (Pressure, FSR, Heart Rate, SpO2)
 Total: 105 points possible
 ```
 
 ### Confidence Thresholds
+
 - **≥80 points**: HIGH CONFIDENCE FALL → Immediate alert
 - **70-79 points**: CONFIRMED FALL → 5-second delay alert
 - **50-69 points**: POTENTIAL FALL → Enhanced monitoring
@@ -161,6 +171,7 @@ Total: 105 points possible
 For detailed algorithm documentation, see [FallDetectionAlgorithm.md](FallDetectionAlgorithm.md).
 
 ### Modular Design
+
 - **Individual sensor testing** with standalone test sketches in `tests/`
 - **Unified main sketch** (`SmartFall.ino`) for complete fall detection system
 - **Hardware abstraction** for easy sensor substitution
@@ -252,12 +263,15 @@ Go to **Tools → Manage Libraries** and install:
 - **Adafruit Unified Sensor** (version 1.1.9 or later)
 - **Adafruit BMP280 Library** (version 2.6.8 or later)
 - **SparkFun MAX3010x Pulse and Proximity Sensor** (version 1.1.2 or later)
+- **DFRobot_BloodOxygen_S** (version 1.0.0 or later) - MAX30102 heart rate sensor driver
+- **DFRobot_RTU** (version 1.0.6 or later) - Required modbus library for DFRobot_BloodOxygen_S
 - **ArduinoJson** (version 6.21.3 or later)
 - **Adafruit BusIO** (automatically installed)
 
 #### 3. Board Configuration
 
 **For ESP32 HUZZAH32 Feather (Original):**
+
 1. **Select Board**: Tools → Board → ESP32 Arduino → **"Adafruit ESP32 Feather"**
 2. **Upload Speed**: Tools → Upload Speed → **921600**
 3. **Flash Frequency**: Tools → Flash Frequency → **80MHz**
@@ -268,6 +282,7 @@ Go to **Tools → Manage Libraries** and install:
    - Windows: `COM3` (or similar)
 
 **For ESP32 Feather V2:**
+
 1. **Select Board**: Tools → Board → ESP32 Arduino → **"Adafruit Feather ESP32 V2"**
 2. **Upload Speed**: Tools → Upload Speed → **921600**
 3. **Flash Frequency**: Tools → Flash Frequency → **80MHz**
@@ -281,6 +296,7 @@ Go to **Tools → Manage Libraries** and install:
 ### Option 3: PlatformIO (Alternative)
 
 **For ESP32 Feather V2:**
+
 ```bash
 # Build
 pio run -e feather_esp32_v2
@@ -296,6 +312,7 @@ pio run -e feather_esp32_v2 -t upload && pio device monitor
 ```
 
 **For ESP32 HUZZAH32 Feather:**
+
 ```bash
 # Build
 pio run -e huzzah32
@@ -318,21 +335,21 @@ pio run -e huzzah32 -t upload && pio device monitor
 
 All I2C devices connect to the same SDA/SCL pins:
 
-| Sensor   | VCC  | GND | SDA     | SCL     |
-|----------|------|-----|---------|---------|
-| MPU6050  | 3.3V | GND | GPIO 22 | GPIO 20 |
-| BMP280   | 3.3V | GND | GPIO 22 | GPIO 20 |
-| MAX30102 | 3.3V | GND | GPIO 22 | GPIO 20 |
+| Sensor   | I2C Address | VCC  | GND | SDA     | SCL     |
+| -------- | ----------- | ---- | --- | ------- | ------- |
+| MPU6050  | 0x68        | 3.3V | GND | GPIO 22 | GPIO 20 |
+| BMP280   | 0x76/0x77   | 3.3V | GND | GPIO 22 | GPIO 20 |
+| MAX30102 | 0x57        | 3.3V | GND | GPIO 22 | GPIO 20 |
 
 ### Analog & Digital Pins
 
-| Component          | ESP32 Pin | Type    | Description |
-|-------------------|-----------|---------|-------------|
-| FSR Sensor        | A2        | Analog  | Force sensor (GPIO 34, ADC1) |
+| Component         | ESP32 Pin | Type    | Description                     |
+| ----------------- | --------- | ------- | ------------------------------- |
+| FSR Sensor        | A2        | Analog  | Force sensor (GPIO 34, ADC1)    |
 | SOS Button        | GPIO 15   | Digital | Emergency button (INPUT_PULLUP) |
-| Speaker (PAM8302) | GPIO 25   | PWM     | Audio output |
-| Haptic Motor      | GPIO 26   | Digital | Vibration feedback |
-| Visual Alert LED  | GPIO 27   | Digital | LED indicator |
+| Speaker (PAM8302) | GPIO 25   | PWM     | Audio output                    |
+| Haptic Motor      | GPIO 26   | Digital | Vibration feedback              |
+| Visual Alert LED  | GPIO 27   | Digital | LED indicator                   |
 | Battery Monitor   | A4        | Analog  | Battery voltage (GPIO 36, ADC1) |
 
 ### PAM8302 Audio Amplifier Wiring
@@ -350,6 +367,7 @@ GND ────────────────── A- (Audio Input-)
 ```
 
 **Speaker Recommendations:**
+
 - **8Ω 0.5W**: Clear audio, low power
 - **8Ω 1W**: Louder, better bass
 - **4Ω 3W**: Maximum loudness (higher current draw)
@@ -363,6 +381,7 @@ GND ────────────────── A- (Audio Input-)
 1. **Upload Main Sketch**
 
    **For ESP32 HUZZAH32 Feather (Original):**
+
    ```bash
    cd SmartFall
    arduino-cli compile --fqbn esp32:esp32:featheresp32 .
@@ -371,6 +390,7 @@ GND ────────────────── A- (Audio Input-)
    ```
 
    **For ESP32 Feather V2:**
+
    ```bash
    cd SmartFall
    arduino-cli compile --fqbn esp32:esp32:adafruit_feather_esp32_v2 .
@@ -379,6 +399,7 @@ GND ────────────────── A- (Audio Input-)
    ```
 
 2. **Expected Serial Output:**
+
    ```
    ========================================
          SmartFall Detection System
@@ -388,7 +409,7 @@ GND ────────────────── A- (Audio Input-)
    --- Initializing Sensors ---
    ✓ MPU6050 initialized
    ✓ BMP280 initialized
-   ✓ MAX30102 initialized
+   ✓ MAX30102 heart rate sensor initialized
    ✓ FSR initialized
    ✓ Fall detector initialized
 
@@ -408,6 +429,7 @@ GND ────────────────── A- (Audio Input-)
 Test each component individually before running the complete system.
 
 **Note:** Replace `BOARD_FQBN` with:
+
 - `esp32:esp32:featheresp32` for ESP32 HUZZAH32 Feather (Original)
 - `esp32:esp32:adafruit_feather_esp32_v2` for ESP32 Feather V2
 
@@ -430,6 +452,16 @@ arduino-cli upload -p PORT --fqbn $BOARD_FQBN .
 cd ../MAX30102
 arduino-cli compile --fqbn $BOARD_FQBN .
 arduino-cli upload -p PORT --fqbn $BOARD_FQBN .
+
+# Test MAX30102 (Heart Rate)
+cd ../MAX30102
+arduino-cli compile --fqbn $BOARD_FQBN .
+arduino-cli upload -p PORT --fqbn $BOARD_FQBN .
+
+# Expected output:
+# MAX30102 sensor initialized
+# Place your finger on the sensor
+# Heart rate data will begin updating after ~10 seconds
 
 # Test FSR (Force Sensor)
 cd ../FSR
@@ -455,16 +487,19 @@ arduino-cli upload -p PORT --fqbn $BOARD_FQBN .
 ### Fall Detection Testing
 
 #### Method 1: Manual SOS Test
+
 - Press the SOS button (GPIO 15)
 - All alerts should activate immediately
 - Release button to reset
 
 #### Method 2: Simulated Fall Test
+
 - Rapidly move/shake the device to trigger acceleration thresholds
 - Monitor serial output for stage progression
 - Verify alert activation on fall detection
 
 #### Method 3: Controlled Testing
+
 - Place device in controlled environment
 - Trigger specific detection stages
 - Observe confidence score buildup
@@ -513,9 +548,11 @@ Edit `SmartFall/utils/config.h`:
 Your server should implement these endpoints:
 
 ##### POST /api/emergency
+
 Receives emergency fall alerts.
 
 **Request Body:**
+
 ```json
 {
   "timestamp": 123456789,
@@ -529,6 +566,7 @@ Receives emergency fall alerts.
 ```
 
 **Expected Response:**
+
 ```json
 {
   "status": "received",
@@ -537,30 +575,32 @@ Receives emergency fall alerts.
 ```
 
 ##### POST /api/status
+
 Receives periodic status updates (every minute).
 
 ##### POST /api/sensor
+
 Receives real-time sensor data (if streaming enabled).
 
 #### Example Node.js Server
 
 ```javascript
-const express = require('express');
+const express = require("express");
 const app = express();
 app.use(express.json());
 
-app.post('/api/emergency', (req, res) => {
-  console.log('Emergency Alert Received:');
+app.post("/api/emergency", (req, res) => {
+  console.log("Emergency Alert Received:");
   console.log(JSON.stringify(req.body, null, 2));
 
   // Send SMS/Email/Push notifications here
   // sendEmergencyNotifications(req.body);
 
-  res.json({ status: 'received', alert_id: Date.now().toString() });
+  res.json({ status: "received", alert_id: Date.now().toString() });
 });
 
 app.listen(80, () => {
-  console.log('SmartFall server listening on port 80');
+  console.log("SmartFall server listening on port 80");
 });
 ```
 
@@ -582,29 +622,30 @@ Edit `SmartFall/utils/config.h`:
 
 **Characteristics:**
 
-| Characteristic | UUID | Properties | Purpose |
-|----------------|------|------------|---------|
-| Emergency Alert | `beb5483e-...` | Notify | Emergency notifications |
-| Sensor Data | `beb5483f-...` | Notify | Real-time sensor streaming |
-| Status | `beb54840-...` | Read, Notify | Device status |
-| Command | `beb54841-...` | Write | App commands |
-| Config | `beb54842-...` | Read, Write | Configuration |
+| Characteristic  | UUID           | Properties   | Purpose                    |
+| --------------- | -------------- | ------------ | -------------------------- |
+| Emergency Alert | `beb5483e-...` | Notify       | Emergency notifications    |
+| Sensor Data     | `beb5483f-...` | Notify       | Real-time sensor streaming |
+| Status          | `beb54840-...` | Read, Notify | Device status              |
+| Command         | `beb54841-...` | Write        | App commands               |
+| Config          | `beb54842-...` | Read, Write  | Configuration              |
 
 #### Step 3: BLE Commands
 
 Mobile apps can send commands via the Command characteristic:
 
-| Command | Value | Description |
-|---------|-------|-------------|
-| Cancel Alert | `0x01` | Cancel ongoing emergency alert |
-| Test Alert | `0x02` | Trigger test alert |
-| Get Status | `0x03` | Request device status |
-| Start Streaming | `0x05` | Enable sensor data streaming |
-| Stop Streaming | `0x06` | Disable sensor data streaming |
+| Command         | Value  | Description                    |
+| --------------- | ------ | ------------------------------ |
+| Cancel Alert    | `0x01` | Cancel ongoing emergency alert |
+| Test Alert      | `0x02` | Trigger test alert             |
+| Get Status      | `0x03` | Request device status          |
+| Start Streaming | `0x05` | Enable sensor data streaming   |
+| Stop Streaming  | `0x06` | Disable sensor data streaming  |
 
 #### Testing BLE
 
 1. Use a BLE scanner app:
+
    - **iOS**: LightBlue
    - **Android**: nRF Connect
 
@@ -716,6 +757,7 @@ Edit `SmartFall/utils/config.h`:
 Upload the audio test module:
 
 **For ESP32 HUZZAH32 Feather (Original):**
+
 ```bash
 cd SmartFall/tests/Audio
 arduino-cli compile --fqbn esp32:esp32:featheresp32 .
@@ -723,6 +765,7 @@ arduino-cli upload -p PORT --fqbn esp32:esp32:featheresp32 .
 ```
 
 **For ESP32 Feather V2:**
+
 ```bash
 cd SmartFall/tests/Audio
 arduino-cli compile --fqbn esp32:esp32:adafruit_feather_esp32_v2 .
@@ -730,6 +773,7 @@ arduino-cli upload -p PORT --fqbn esp32:esp32:adafruit_feather_esp32_v2 .
 ```
 
 The test will automatically play through all audio features:
+
 - Startup melody
 - Volume control test (25%, 50%, 75%, 100%)
 - Frequency sweep (500Hz - 2000Hz)
@@ -755,18 +799,21 @@ All system configuration is centralized in `SmartFall/utils/config.h`.
 
 ```cpp
 // I2C Pins (shared by all I2C sensors)
-#define MPU6050_SDA_PIN            23
-#define MPU6050_SCL_PIN            22
+#define MPU6050_SDA_PIN            SDA     // GPIO 22
+#define MPU6050_SCL_PIN            SCL     // GPIO 20
+#define MAX30102_SDA_PIN           SDA     // GPIO 22 (shared)
+#define MAX30102_SCL_PIN           SCL     // GPIO 20 (shared)
+#define MAX30102_RST_PIN           A9      // GPIO 21 (Reset pin)
 
 // Analog Pins
-#define FSR_ANALOG_PIN             A2
-#define BATTERY_SENSE_PIN          A13
+#define FSR_ANALOG_PIN             A2      // GPIO 34
+#define BATTERY_SENSE_PIN          A13     // GPIO 35
 
 // Digital Pins
-#define SOS_BUTTON_PIN             15
-#define SPEAKER_PIN                25
-#define HAPTIC_PIN                 26
-#define VISUAL_ALERT_PIN           27
+#define SOS_BUTTON_PIN             15      // GPIO 15
+#define SPEAKER_PIN                25      // GPIO 25 (PWM)
+#define HAPTIC_PIN                 26      // GPIO 26
+#define VISUAL_ALERT_PIN           27      // GPIO 27
 ```
 
 ### Fall Detection Thresholds
@@ -779,11 +826,27 @@ All system configuration is centralized in `SmartFall/utils/config.h`.
 #define INACTIVITY_THRESHOLD_MS    2000    // Inactivity duration (ms)
 
 // Confidence scoring
-#define MAX_CONFIDENCE_SCORE       105
+#define MAX_CONFIDENCE_SCORE       100
 #define HIGH_CONFIDENCE_THRESHOLD  80
 #define CONFIRMED_THRESHOLD        70
 #define POTENTIAL_THRESHOLD        50
 #define SUSPICIOUS_THRESHOLD       30
+```
+
+### Heart Rate Sensor Configuration (MAX30102)
+
+```cpp
+// MAX30102 sensor operates automatically after initialization
+// The sensor reads heart rate and SpO2 every 4 seconds (per documentation)
+// Data is available in currentSensorData.heart_rate (BPM)
+//                      currentSensorData.spo2 (%)
+//                      currentSensorData.heart_rate_temperature (°C)
+
+// Physiological validation for fall detection:
+// - Heart rate increase >= 40 BPM: +8 points confidence
+// - Heart rate increase >= 20 BPM: +5 points confidence
+// - Normal SpO2 (>= 90%): +5 points confidence
+// - Slightly reduced SpO2 (85-90%): +2 points confidence
 ```
 
 ### Timing Constants
@@ -820,6 +883,7 @@ All system configuration is centralized in `SmartFall/utils/config.h`.
 **Problem:** "ERROR: Failed to initialize [SENSOR]!"
 
 **Solutions:**
+
 1. **Check wiring**: Verify I2C connections (SDA/SCL)
 2. **Check I2C addresses**: Run I2C scanner sketch
 3. **Power issues**: Ensure stable 3.3V power supply
@@ -830,6 +894,7 @@ All system configuration is centralized in `SmartFall/utils/config.h`.
 **Problem:** Cannot upload sketch to ESP32
 
 **Solutions:**
+
 1. **Press BOOT button**: Hold during upload if needed
 2. **Check USB cable**: Try different cable (data cable, not charge-only)
 3. **Driver issues**: Install CP2104 or CH340 USB drivers
@@ -844,6 +909,7 @@ All system configuration is centralized in `SmartFall/utils/config.h`.
 **Problem:** Serial monitor shows nothing
 
 **Solutions:**
+
 1. Verify baud rate is **115200**
 2. Check USB connection
 3. Press RESET button on board
@@ -854,6 +920,7 @@ All system configuration is centralized in `SmartFall/utils/config.h`.
 **Problem:** "WiFi connection failed"
 
 **Solutions:**
+
 1. Verify SSID and password in `config.h`
 2. Check if network is **2.4GHz** (ESP32 doesn't support 5GHz)
 3. Ensure ESP32 is within range of router
@@ -864,6 +931,7 @@ All system configuration is centralized in `SmartFall/utils/config.h`.
 **Problem:** Cannot find "SmartFall" device
 
 **Solutions:**
+
 1. Verify BLE is initialized (check serial output)
 2. Move phone closer to ESP32
 3. Restart both devices
@@ -874,6 +942,7 @@ All system configuration is centralized in `SmartFall/utils/config.h`.
 **Problem:** PAM8302 amplifier produces no sound
 
 **Solutions:**
+
 1. **Check wiring**:
    - GPIO 25 → A+ on PAM8302
    - GND → A- and GND on PAM8302
@@ -882,11 +951,38 @@ All system configuration is centralized in `SmartFall/utils/config.h`.
 3. **Check volume**: `audioManager.setVolume(100);`
 4. **Test speaker**: Connect to another audio source
 
+### MAX30102 Heart Rate Sensor Not Detected
+
+**Problem:** "ERROR: Failed to initialize MAX30102 heart rate sensor!"
+
+**Solutions:**
+
+1. **Check I2C wiring**: Verify SDA (GPIO 22) and SCL (GPIO 20) connections
+2. **Check address**: MAX30102 uses I2C address **0x57** (not 0x68)
+3. **Check power**: Ensure stable 3.3V supply to sensor
+4. **Reset pin**: Verify GPIO 21 is connected to RST pin (active LOW)
+5. **Test with I2C scanner**: Check if device responds at 0x57
+6. **Library installation**: Verify `DFRobot_BloodOxygen_S` library is installed
+7. **Test individually**: Use the MAX30102 test module in `tests/MAX30102/`
+
+### Heart Rate Data Not Updating
+
+**Problem:** Serial output shows heart rate as 0 or unchanged
+
+**Solutions:**
+
+1. **Sensor stabilization**: MAX30102 needs ~10 seconds of stable wear to acquire first reading
+2. **Finger placement**: Ensure finger is placed correctly on sensor with firm pressure
+3. **Movement**: Excessive movement can prevent readings; keep device still
+4. **Wait for 4-second update**: Sensor updates heart rate data every 4 seconds
+5. **Check debug output**: Enable `DEBUG_SENSOR_DATA` to see raw readings
+
 ### Distorted Audio
 
 **Problem:** Audio sounds distorted or crackling
 
 **Solutions:**
+
 1. Lower volume: `audioManager.setVolume(50);`
 2. Add power filtering: 100µF capacitor between VIN and GND on PAM8302
 3. Use separate power supply if ESP32 is power-constrained
@@ -897,18 +993,21 @@ All system configuration is centralized in `SmartFall/utils/config.h`.
 ## 🎓 Advanced Topics
 
 ### Multi-Sensor Data Fusion
+
 - **6-axis IMU**: Acceleration and gyroscope data for motion analysis
 - **Pressure Sensor**: Altitude change detection during falls
-- **Heart Rate Monitor**: Physiological response validation
+- **Heart Rate Monitor (MAX30102)**: Heart rate and SpO2 measurement for physiological stress validation
 - **Force Sensor**: Impact detection and device attachment validation
 
 ### Real-Time Processing
+
 - **100Hz sampling rate** for accurate motion capture
 - **10-second detection window** with stage-based analysis
 - **Memory-optimized** for ESP32's 4MB Flash / 520KB SRAM
 - **Interrupt-driven** SOS button with <100ms response time
 
 ### Advanced Algorithm Features
+
 - **Sequential stage detection** prevents false positives
 - **Confidence-based scoring** with detailed breakdown
 - **Hardware abstraction** enables simulation-first development
@@ -917,12 +1016,14 @@ All system configuration is centralized in `SmartFall/utils/config.h`.
 ### Performance Characteristics
 
 #### Detection Accuracy
+
 - **Free fall threshold**: <0.5g for ≥200ms
 - **Impact threshold**: >3.0g within 1 second
 - **Rotation threshold**: >250°/s angular velocity
 - **Inactivity threshold**: ≥2 seconds stable position
 
 #### System Timing
+
 - **Sensor sampling**: 10ms intervals (100Hz)
 - **Detection response**: <2 seconds from fall to first alert
 - **Alert timeout**: 30-second user response window
@@ -931,6 +1032,7 @@ All system configuration is centralized in `SmartFall/utils/config.h`.
 ### Development Team Support
 
 This project supports **parallel development** with clear module boundaries:
+
 - **Sensor Integration Team**: Hardware abstraction and sensor modules
 - **Algorithm Team**: Fall detection logic and confidence scoring
 - **Communication Team**: Bluetooth/WiFi and emergency protocols
@@ -955,6 +1057,7 @@ MIT License - Feel free to use this project for educational and research purpose
 ## 🤝 Support
 
 For issues or questions:
+
 1. Check this README first
 2. Review [FallDetectionAlgorithm.md](FallDetectionAlgorithm.md) for algorithm questions
 3. Test individual components using test modules

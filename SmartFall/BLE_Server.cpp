@@ -2,7 +2,7 @@
 #include <ArduinoJson.h>
 
 // Server Callbacks Implementation
-void BLE_Server::ServerCallbacks::onConnect(BLEServer *server)
+void SmartFallBLEServer::ServerCallbacks::onConnect(BLEServer *server)
 {
     parent->device_connected = true;
     Serial.println("[BLE] Client connected");
@@ -13,7 +13,7 @@ void BLE_Server::ServerCallbacks::onConnect(BLEServer *server)
     }
 }
 
-void BLE_Server::ServerCallbacks::onDisconnect(BLEServer *server)
+void SmartFallBLEServer::ServerCallbacks::onDisconnect(BLEServer *server)
 {
     parent->device_connected = false;
     Serial.println("[BLE] Client disconnected");
@@ -28,7 +28,7 @@ void BLE_Server::ServerCallbacks::onDisconnect(BLEServer *server)
 }
 
 // Command Callbacks Implementation
-void BLE_Server::CommandCallbacks::onWrite(BLECharacteristic *characteristic)
+void SmartFallBLEServer::CommandCallbacks::onWrite(BLECharacteristic *characteristic)
 {
     String value = characteristic->getValue();
 
@@ -49,29 +49,29 @@ void BLE_Server::CommandCallbacks::onWrite(BLECharacteristic *characteristic)
 }
 
 // BLE_Server Implementation
-BLE_Server::BLE_Server() : initialized(false), device_connected(false),
-                           streaming_enabled(false), last_notification(0),
-                           notification_interval(1000), device_name("SmartFall"),
-                           ble_server(nullptr), ble_service(nullptr),
-                           emergency_char(nullptr), sensor_char(nullptr),
-                           status_char(nullptr), command_char(nullptr),
-                           config_char(nullptr), on_connect_callback(nullptr),
-                           on_disconnect_callback(nullptr), on_command_callback(nullptr),
-                           server_callbacks(nullptr), command_callbacks(nullptr)
+SmartFallBLEServer::SmartFallBLEServer() : initialized(false), device_connected(false),
+                                           streaming_enabled(false), last_notification(0),
+                                           notification_interval(1000), device_name("SmartFall"),
+                                           ble_server(nullptr), ble_service(nullptr),
+                                           emergency_char(nullptr), sensor_char(nullptr),
+                                           status_char(nullptr), command_char(nullptr),
+                                           config_char(nullptr), on_connect_callback(nullptr),
+                                           on_disconnect_callback(nullptr), on_command_callback(nullptr),
+                                           server_callbacks(nullptr), command_callbacks(nullptr)
 {
 }
 
-BLE_Server::~BLE_Server()
+SmartFallBLEServer::~SmartFallBLEServer()
 {
     end();
 }
 
-bool BLE_Server::begin()
+bool SmartFallBLEServer::begin()
 {
     return begin("SmartFall");
 }
 
-bool BLE_Server::begin(const char *name)
+bool SmartFallBLEServer::begin(const char *name)
 {
     if (initialized)
     {
@@ -112,7 +112,7 @@ bool BLE_Server::begin(const char *name)
     return true;
 }
 
-void BLE_Server::end()
+void SmartFallBLEServer::end()
 {
     if (initialized)
     {
@@ -130,12 +130,12 @@ void BLE_Server::end()
     }
 }
 
-bool BLE_Server::isConnected()
+bool SmartFallBLEServer::isConnected()
 {
     return device_connected;
 }
 
-void BLE_Server::startAdvertising()
+void SmartFallBLEServer::startAdvertising()
 {
     BLEAdvertising *advertising = BLEDevice::getAdvertising();
     advertising->addServiceUUID(SERVICE_UUID);
@@ -150,7 +150,7 @@ void BLE_Server::startAdvertising()
     }
 }
 
-void BLE_Server::stopAdvertising()
+void SmartFallBLEServer::stopAdvertising()
 {
     BLEDevice::stopAdvertising();
     if (DEBUG_COMMUNICATION)
@@ -159,7 +159,7 @@ void BLE_Server::stopAdvertising()
     }
 }
 
-bool BLE_Server::sendEmergencyAlert(const EmergencyData_t &emergency_data)
+bool SmartFallBLEServer::sendEmergencyAlert(const EmergencyData_t &emergency_data)
 {
     if (!initialized || !device_connected)
     {
@@ -193,7 +193,7 @@ bool BLE_Server::sendEmergencyAlert(const EmergencyData_t &emergency_data)
     return success;
 }
 
-bool BLE_Server::sendSensorData(const SensorData_t &sensor_data)
+bool SmartFallBLEServer::sendSensorData(const SensorData_t &sensor_data)
 {
     if (!initialized || !device_connected)
     {
@@ -211,7 +211,7 @@ bool BLE_Server::sendSensorData(const SensorData_t &sensor_data)
                                 json_payload.length());
 }
 
-bool BLE_Server::sendStatusUpdate(const SystemStatus_t &status_data)
+bool SmartFallBLEServer::sendStatusUpdate(const SystemStatus_t &status_data)
 {
     if (!initialized || !device_connected)
     {
@@ -224,7 +224,7 @@ bool BLE_Server::sendStatusUpdate(const SystemStatus_t &status_data)
                                 json_payload.length());
 }
 
-void BLE_Server::enableStreaming(bool enable)
+void SmartFallBLEServer::enableStreaming(bool enable)
 {
     streaming_enabled = enable;
 
@@ -235,17 +235,17 @@ void BLE_Server::enableStreaming(bool enable)
     }
 }
 
-bool BLE_Server::isStreaming()
+bool SmartFallBLEServer::isStreaming()
 {
     return streaming_enabled;
 }
 
-void BLE_Server::setStreamingInterval(uint32_t interval_ms)
+void SmartFallBLEServer::setStreamingInterval(uint32_t interval_ms)
 {
     notification_interval = interval_ms;
 }
 
-bool BLE_Server::shouldStream()
+bool SmartFallBLEServer::shouldStream()
 {
     if (!streaming_enabled || !device_connected)
     {
@@ -262,32 +262,32 @@ bool BLE_Server::shouldStream()
     return false;
 }
 
-void BLE_Server::onConnect(void (*callback)())
+void SmartFallBLEServer::onConnect(void (*callback)())
 {
     on_connect_callback = callback;
 }
 
-void BLE_Server::onDisconnect(void (*callback)())
+void SmartFallBLEServer::onDisconnect(void (*callback)())
 {
     on_disconnect_callback = callback;
 }
 
-void BLE_Server::onCommand(void (*callback)(uint8_t, uint8_t *, size_t))
+void SmartFallBLEServer::onCommand(void (*callback)(uint8_t, uint8_t *, size_t))
 {
     on_command_callback = callback;
 }
 
-String BLE_Server::getDeviceName()
+String SmartFallBLEServer::getDeviceName()
 {
     return device_name;
 }
 
-bool BLE_Server::isInitialized()
+bool SmartFallBLEServer::isInitialized()
 {
     return initialized;
 }
 
-void BLE_Server::printConnectionInfo()
+void SmartFallBLEServer::printConnectionInfo()
 {
     Serial.println("=== BLE Connection Info ===");
     Serial.print("Device Name: ");
@@ -301,7 +301,7 @@ void BLE_Server::printConnectionInfo()
 
 // Private helper functions
 
-void BLE_Server::createCharacteristics()
+void SmartFallBLEServer::createCharacteristics()
 {
     // Emergency Alert Characteristic (Notify)
     emergency_char = ble_service->createCharacteristic(
@@ -334,7 +334,7 @@ void BLE_Server::createCharacteristics()
         BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_WRITE);
 }
 
-void BLE_Server::handleCommand(uint8_t command, uint8_t *data, size_t length)
+void SmartFallBLEServer::handleCommand(uint8_t command, uint8_t *data, size_t length)
 {
     switch (command)
     {
@@ -377,7 +377,7 @@ void BLE_Server::handleCommand(uint8_t command, uint8_t *data, size_t length)
     }
 }
 
-bool BLE_Server::notifyCharacteristic(BLECharacteristic *characteristic, uint8_t *data, size_t length)
+bool SmartFallBLEServer::notifyCharacteristic(BLECharacteristic *characteristic, uint8_t *data, size_t length)
 {
     if (characteristic == nullptr || !device_connected)
     {
@@ -397,7 +397,7 @@ bool BLE_Server::notifyCharacteristic(BLECharacteristic *characteristic, uint8_t
     }
 }
 
-String BLE_Server::createEmergencyJSON(const EmergencyData_t &data)
+String SmartFallBLEServer::createEmergencyJSON(const EmergencyData_t &data)
 {
     DynamicJsonDocument doc(2048);
 
@@ -414,7 +414,7 @@ String BLE_Server::createEmergencyJSON(const EmergencyData_t &data)
     return json_string;
 }
 
-String BLE_Server::createSensorDataJSON(const SensorData_t &data)
+String SmartFallBLEServer::createSensorDataJSON(const SensorData_t &data)
 {
     DynamicJsonDocument doc(512);
 
@@ -426,7 +426,6 @@ String BLE_Server::createSensorDataJSON(const SensorData_t &data)
     doc["gyro_x"] = data.gyro_x;
     doc["gyro_y"] = data.gyro_y;
     doc["gyro_z"] = data.gyro_z;
-    doc["heart_rate"] = data.heart_rate;
     doc["pressure"] = data.pressure;
 
     String json_string;
@@ -434,7 +433,7 @@ String BLE_Server::createSensorDataJSON(const SensorData_t &data)
     return json_string;
 }
 
-String BLE_Server::createStatusJSON(const SystemStatus_t &data)
+String SmartFallBLEServer::createStatusJSON(const SystemStatus_t &data)
 {
     DynamicJsonDocument doc(512);
 

@@ -1,369 +1,517 @@
 #include "WiFi_Manager.h"
 #include <ArduinoJson.h>
 
-WiFi_Manager::WiFi_Manager() : initialized(false), connected(false),
-                                 last_reconnect_attempt(0), reconnect_interval(30000),
-                                 connection_attempts(0), auto_reconnect(true),
-                                 last_status_check(0) {
+WiFiManager::WiFiManager()
+{
+    lastReconnectAttempt = 0;
+    reconnectInterval = 30000; // 30 seconds
+    lastPingTime = 0;
+    pingInterval = 5000; // 5 seconds default
+    autoReconnect = false;
+    initialized = false;
 }
 
-WiFi_Manager::~WiFi_Manager() {
-    if (connected) {
-        disconnect();
-    }
-}
+bool WiFiManager::begin(const char *wifi_ssid, const char *wifi_password)
+{
+    ssid = String(wifi_ssid);
+    password = String(wifi_password);
 
-bool WiFi_Manager::begin() {
-    // Use credentials from config.h
-    return begin(WIFI_SSID, WIFI_PASSWORD);
-}
-
-bool WiFi_Manager::begin(const char* ssid_param, const char* password_param) {
-    if (initialized) {
-        Serial.println("[WiFi] Already initialized");
-        return true;
-    }
-
-    ssid = String(ssid_param);
-    password = String(password_param);
-
-    if (ssid.length() == 0) {
-        Serial.println("[WiFi] ERROR: SSID is empty!");
-        return false;
-    }
+    Serial.print("Connecting to WiFi: ");
+    Serial.println(ssid);
 
     WiFi.mode(WIFI_STA);
-    WiFi.setAutoReconnect(false);  // We handle reconnection manually
+    WiFi.begin(wifi_ssid, wifi_password);
 
-    initialized = true;
-    Serial.println("[WiFi] Manager initialized");
-
-    return connect();
-}
-
-void WiFi_Manager::setServerURL(const char* url) {
-    server_url = String(url);
-    if (DEBUG_COMMUNICATION) {
-        Serial.print("[WiFi] Server URL set to: ");
-        Serial.println(server_url);
-    }
-}
-
-bool WiFi_Manager::connect() {
-    return connect(ssid.c_str(), password.c_str());
-}
-
-bool WiFi_Manager::connect(const char* ssid_param, const char* password_param) {
-    if (!initialized && !begin(ssid_param, password_param)) {
-        return false;
-    }
-
-    if (connected) {
-        Serial.println("[WiFi] Already connected");
-        return true;
-    }
-
-    Serial.print("[WiFi] Connecting to: ");
-    Serial.println(ssid_param);
-
-    WiFi.begin(ssid_param, password_param);
-
-    uint32_t start_time = millis();
-    connection_attempts++;
-
-    while (WiFi.status() != WL_CONNECTED && (millis() - start_time) < WIFI_TIMEOUT_MS) {
+    unsigned long startTime = millis();
+    while (WiFi.status() != WL_CONNECTED && millis() - startTime < 10000)
+    {
         delay(500);
         Serial.print(".");
     }
     Serial.println();
 
-    if (WiFi.status() == WL_CONNECTED) {
-        connected = true;
-        connection_attempts = 0;
-        Serial.println("[WiFi] ✓ Connected!");
-        printConnectionInfo();
+    if (WiFi.status() == WL_CONNECTED)
+    {
+        Serial.println("WiFi connected successfully!");
+        Serial.print("IP Address: ");
+        Serial.println(WiFi.localIP());
+        Serial.print("Signal Strength (RSSI): ");
+        Serial.print(WiFi.RSSI());
+        Serial.println(" dBm");
+        initialized = true;
         return true;
-    } else {
-        connected = false;
-        Serial.print("[WiFi] Connection failed (attempt ");
-        Serial.print(connection_attempts);
-        Serial.println(")");
+    }
+    else
+    {
+        Serial.println("WiFi connection failed!");
+        initialized = false;
         return false;
     }
 }
 
-void WiFi_Manager::disconnect() {
-    if (connected) {
-        WiFi.disconnect();
-        connected = false;
-        Serial.println("[WiFi] Disconnected");
-    }
+void WiFiManager::setServerURL(const char *url)
+{
+    serverURL = String(url);
+    Serial.print("Server URL set to: ");
+    Serial.println(serverURL);
 }
 
-bool WiFi_Manager::reconnect() {
-    Serial.println("[WiFi] Attempting reconnection...");
-    disconnect();
-    delay(1000);
-    return connect();
+void WiFiManager::enableAutoReconnect(bool enable)
+{
+    autoReconnect = enable;
+    Serial.print("Auto-reconnect: ");
+    Serial.println(enable ? "Enabled" : "Disabled");
 }
 
-bool WiFi_Manager::isConnected() {
-    updateConnectionStatus();
-    return connected;
+bool WiFiManager::isConnected()
+{
+    return WiFi.status() == WL_CONNECTED;
 }
 
-void WiFi_Manager::enableAutoReconnect(bool enable) {
-    auto_reconnect = enable;
-    if (DEBUG_COMMUNICATION) {
-        Serial.print("[WiFi] Auto-reconnect: ");
-        Serial.println(enable ? "enabled" : "disabled");
-    }
-}
-
-void WiFi_Manager::checkConnection() {
-    if (!initialized || !auto_reconnect) {
+void WiFiManager::checkConnection()
+{
+    if (!autoReconnect)
         return;
-    }
 
-    uint32_t current_time = millis();
-
-    // Check status every 5 seconds
-    if (current_time - last_status_check >= 5000) {
-        last_status_check = current_time;
-        updateConnectionStatus();
-
-        if (!connected && (current_time - last_reconnect_attempt >= reconnect_interval)) {
-            last_reconnect_attempt = current_time;
-            Serial.println("[WiFi] Connection lost, attempting reconnect...");
+    if (!isConnected())
+    {
+        unsigned long currentTime = millis();
+        if (currentTime - lastReconnectAttempt >= reconnectInterval)
+        {
+            lastReconnectAttempt = currentTime;
+            Serial.println("\n[WiFi] Connection lost. Attempting to reconnect...");
             reconnect();
         }
     }
 }
 
-String WiFi_Manager::getSSID() {
-    return WiFi.SSID();
+bool WiFiManager::reconnect()
+{
+    WiFi.disconnect();
+    delay(100);
+    return begin(ssid.c_str(), password.c_str());
 }
 
-int8_t WiFi_Manager::getSignalStrength() {
-    return WiFi.RSSI();
-}
-
-String WiFi_Manager::getIPAddress() {
-    return WiFi.localIP().toString();
-}
-
-String WiFi_Manager::getMACAddress() {
-    return WiFi.macAddress();
-}
-
-bool WiFi_Manager::sendEmergencyAlert(const EmergencyData_t& emergency_data) {
-    if (!connected) {
-        Serial.println("[WiFi] Cannot send alert - not connected");
+bool WiFiManager::sendTestMessage(const String &message)
+{
+    if (!isConnected())
+    {
+        Serial.println("Error: WiFi not connected!");
         return false;
     }
 
-    if (server_url.length() == 0) {
-        Serial.println("[WiFi] ERROR: Server URL not set!");
+    if (serverURL.length() == 0)
+    {
+        Serial.println("Error: Server URL not set!");
         return false;
     }
 
-    String json_payload = createEmergencyJSON(emergency_data);
-    String response;
+    HTTPClient http;
+    http.begin(serverURL);
+    http.addHeader("Content-Type", "text/plain");
 
-    String endpoint = server_url + "/api/emergency";
+    Serial.print("Sending test message to: ");
+    Serial.println(serverURL);
 
-    if (DEBUG_COMMUNICATION) {
-        Serial.println("[WiFi] Sending emergency alert...");
-        Serial.println(json_payload);
-    }
+    int httpResponseCode = http.POST(message);
 
-    bool success = sendHTTPPost(endpoint.c_str(), json_payload);
-
-    if (success) {
-        Serial.println("[WiFi] ✓ Emergency alert sent successfully");
-    } else {
-        Serial.println("[WiFi] ✗ Failed to send emergency alert");
-    }
-
-    return success;
-}
-
-bool WiFi_Manager::sendStatusUpdate(const StatusData_t& status_data) {
-    if (!connected) return false;
-
-    String json_payload = createStatusJSON(status_data);
-    String endpoint = server_url + "/api/status";
-
-    return sendHTTPPost(endpoint.c_str(), json_payload);
-}
-
-bool WiFi_Manager::sendSensorData(const SensorData_t& sensor_data) {
-    if (!connected) return false;
-
-    String json_payload = createSensorDataJSON(sensor_data);
-    String endpoint = server_url + "/api/sensor";
-
-    return sendHTTPPost(endpoint.c_str(), json_payload);
-}
-
-bool WiFi_Manager::sendHTTPPost(const char* endpoint, const String& json_payload) {
-    if (!connected) {
-        Serial.println("[WiFi] Cannot send POST - not connected");
-        return false;
-    }
-
-    http.begin(endpoint);
-    http.addHeader("Content-Type", "application/json");
-    http.setTimeout(10000);  // 10-second timeout
-
-    int http_code = http.POST(json_payload);
-
-    bool success = (http_code == HTTP_CODE_OK || http_code == HTTP_CODE_CREATED);
-
-    if (DEBUG_COMMUNICATION) {
-        Serial.print("[WiFi] POST ");
-        Serial.print(endpoint);
-        Serial.print(" - Status: ");
-        Serial.println(http_code);
-    }
-
-    http.end();
-    return success;
-}
-
-bool WiFi_Manager::sendHTTPGet(const char* endpoint, String& response) {
-    if (!connected) return false;
-
-    http.begin(endpoint);
-    http.setTimeout(10000);
-
-    int http_code = http.GET();
-
-    if (http_code == HTTP_CODE_OK) {
-        response = http.getString();
+    if (httpResponseCode > 0)
+    {
+        Serial.print("HTTP Response code: ");
+        Serial.println(httpResponseCode);
+        String response = http.getString();
+        Serial.print("Server response: ");
+        Serial.println(response);
         http.end();
         return true;
     }
+    else
+    {
+        Serial.print("Error sending message. HTTP error code: ");
+        Serial.println(httpResponseCode);
+        http.end();
+        return false;
+    }
+}
+
+bool WiFiManager::sendJSON(const String &jsonPayload)
+{
+    if (!isConnected())
+    {
+        Serial.println("Error: WiFi not connected!");
+        return false;
+    }
+
+    if (serverURL.length() == 0)
+    {
+        Serial.println("Error: Server URL not set!");
+        return false;
+    }
+
+    HTTPClient http;
+    http.begin(serverURL);
+    http.addHeader("Content-Type", "application/json");
+
+    Serial.println("Sending JSON payload:");
+    Serial.println(jsonPayload);
+
+    int httpResponseCode = http.POST(jsonPayload);
+
+    if (httpResponseCode > 0)
+    {
+        Serial.print("HTTP Response code: ");
+        Serial.println(httpResponseCode);
+        String response = http.getString();
+        Serial.print("Server response: ");
+        Serial.println(response);
+        http.end();
+        return true;
+    }
+    else
+    {
+        Serial.print("Error sending JSON. HTTP error code: ");
+        Serial.println(httpResponseCode);
+        http.end();
+        return false;
+    }
+}
+
+void WiFiManager::printConnectionInfo()
+{
+    Serial.println("\n=== WiFi Connection Info ===");
+    Serial.print("Status: ");
+    Serial.println(isConnected() ? "Connected" : "Disconnected");
+
+    if (isConnected())
+    {
+        Serial.print("SSID: ");
+        Serial.println(WiFi.SSID());
+        Serial.print("IP Address: ");
+        Serial.println(WiFi.localIP());
+        Serial.print("Gateway: ");
+        Serial.println(WiFi.gatewayIP());
+        Serial.print("Subnet Mask: ");
+        Serial.println(WiFi.subnetMask());
+        Serial.print("DNS: ");
+        Serial.println(WiFi.dnsIP());
+        Serial.print("Signal Strength (RSSI): ");
+        Serial.print(WiFi.RSSI());
+        Serial.println(" dBm");
+        Serial.print("MAC Address: ");
+        Serial.println(WiFi.macAddress());
+    }
+    Serial.println("============================\n");
+}
+
+String WiFiManager::getLocalIP()
+{
+    return WiFi.localIP().toString();
+}
+
+int WiFiManager::getRSSI()
+{
+    return WiFi.RSSI();
+}
+
+bool WiFiManager::sendEmergencyAlert(const EmergencyData_t &emergency_data)
+{
+    if (!isConnected())
+    {
+        Serial.println("[WiFi] Error: Not connected!");
+        return false;
+    }
+
+    DynamicJsonDocument doc(2048);
+    doc["device_id"] = String(emergency_data.device_id);
+    doc["timestamp"] = emergency_data.timestamp;
+    doc["confidence_score"] = emergency_data.confidence_score;
+    doc["confidence_level"] = emergency_data.confidence;
+    doc["battery_level"] = emergency_data.battery_level;
+    doc["sos_triggered"] = emergency_data.sos_triggered;
+
+    JsonObject sensors = doc.createNestedObject("sensor_data");
+    sensors["accel_x"] = emergency_data.sensor_history[0].accel_x;
+    sensors["accel_y"] = emergency_data.sensor_history[0].accel_y;
+    sensors["accel_z"] = emergency_data.sensor_history[0].accel_z;
+    sensors["gyro_x"] = emergency_data.sensor_history[0].gyro_x;
+    sensors["gyro_y"] = emergency_data.sensor_history[0].gyro_y;
+    sensors["gyro_z"] = emergency_data.sensor_history[0].gyro_z;
+    sensors["pressure"] = emergency_data.sensor_history[0].pressure;
+
+    String jsonPayload;
+    serializeJson(doc, jsonPayload);
+
+    String endpoint = getEndpointURL("/api/falls");
+
+    HTTPClient http;
+    http.begin(endpoint);
+    http.addHeader("Content-Type", "application/json");
+
+    Serial.println("[WiFi] Sending emergency alert to: " + endpoint);
+
+    int httpResponseCode = http.POST(jsonPayload);
+
+    bool success = (httpResponseCode >= 200 && httpResponseCode < 300);
+
+    if (success)
+    {
+        Serial.print("[WiFi] Emergency alert sent successfully (");
+        Serial.print(httpResponseCode);
+        Serial.println(")");
+    }
+    else
+    {
+        Serial.print("[WiFi] Emergency alert failed (");
+        Serial.print(httpResponseCode);
+        Serial.println(")");
+    }
 
     http.end();
-    return false;
+    return success;
 }
 
-void WiFi_Manager::setReconnectInterval(uint32_t interval_ms) {
-    reconnect_interval = interval_ms;
-}
-
-uint8_t WiFi_Manager::getConnectionAttempts() {
-    return connection_attempts;
-}
-
-void WiFi_Manager::resetConnectionAttempts() {
-    connection_attempts = 0;
-}
-
-void WiFi_Manager::printConnectionInfo() {
-    Serial.println("=== WiFi Connection Info ===");
-    Serial.print("SSID: ");
-    Serial.println(getSSID());
-    Serial.print("IP Address: ");
-    Serial.println(getIPAddress());
-    Serial.print("MAC Address: ");
-    Serial.println(getMACAddress());
-    Serial.print("Signal Strength: ");
-    Serial.print(getSignalStrength());
-    Serial.println(" dBm");
-    Serial.println("============================");
-}
-
-void WiFi_Manager::printNetworkStatus() {
-    Serial.print("[WiFi] Status: ");
-    if (connected) {
-        Serial.print("Connected to ");
-        Serial.print(getSSID());
-        Serial.print(" (");
-        Serial.print(getSignalStrength());
-        Serial.println(" dBm)");
-    } else {
-        Serial.println("Not connected");
-    }
-}
-
-bool WiFi_Manager::isInitialized() {
-    return initialized;
-}
-
-// Private helper functions
-
-String WiFi_Manager::createEmergencyJSON(const EmergencyData_t& data) {
-    DynamicJsonDocument doc(4096);
-
-    doc["timestamp"] = data.timestamp;
-    doc["confidence_score"] = data.confidence_score;
-    doc["confidence_level"] = data.confidence;
-    doc["battery_level"] = data.battery_level;
-    doc["sos_triggered"] = data.sos_triggered;
-    doc["device_id"] = String(data.device_id);
-
-    // Add sensor history (last 10 samples for brevity)
-    JsonArray history = doc.createNestedArray("sensor_history");
-    for (int i = 90; i < 100; i++) {
-        JsonObject sample = history.createNestedObject();
-        sample["timestamp"] = data.sensor_history[i].timestamp;
-        sample["accel_x"] = data.sensor_history[i].accel_x;
-        sample["accel_y"] = data.sensor_history[i].accel_y;
-        sample["accel_z"] = data.sensor_history[i].accel_z;
-        sample["gyro_x"] = data.sensor_history[i].gyro_x;
-        sample["gyro_y"] = data.sensor_history[i].gyro_y;
-        sample["gyro_z"] = data.sensor_history[i].gyro_z;
-        sample["heart_rate"] = data.sensor_history[i].heart_rate;
+bool WiFiManager::sendStatusUpdate(const SystemStatus_t &status_data)
+{
+    if (!isConnected())
+    {
+        return false;
     }
 
-    String json_string;
-    serializeJson(doc, json_string);
-    return json_string;
-}
-
-String WiFi_Manager::createStatusJSON(const StatusData_t& data) {
     DynamicJsonDocument doc(512);
+    doc["battery_level"] = status_data.battery_percentage;
+    doc["wifi_connected"] = status_data.wifi_connected;
+    doc["bluetooth_connected"] = status_data.bluetooth_connected;
+    doc["sensors_initialized"] = status_data.sensors_initialized;
+    doc["uptime"] = status_data.uptime_ms;
+    doc["current_status"] = status_data.current_status;
 
-    doc["timestamp"] = data.timestamp;
-    doc["battery_level"] = data.battery_level;
-    doc["system_health"] = data.system_health;
-    doc["uptime"] = data.uptime;
-    doc["status_message"] = String(data.status_message);
+    String jsonPayload;
+    serializeJson(doc, jsonPayload);
 
-    String json_string;
-    serializeJson(doc, json_string);
-    return json_string;
+    String endpoint = getEndpointURL("/api/device/status");
+
+    HTTPClient http;
+    http.begin(endpoint);
+    http.addHeader("Content-Type", "application/json");
+    http.addHeader("X-Device-ID", WiFi.macAddress());
+
+    int httpResponseCode = http.POST(jsonPayload);
+    bool success = (httpResponseCode >= 200 && httpResponseCode < 300);
+
+    http.end();
+    return success;
 }
 
-String WiFi_Manager::createSensorDataJSON(const SensorData_t& data) {
+bool WiFiManager::sendSensorData(const SensorData_t &sensor_data)
+{
+    if (!isConnected())
+    {
+        return false;
+    }
+
     DynamicJsonDocument doc(512);
+    doc["accel_x"] = sensor_data.accel_x;
+    doc["accel_y"] = sensor_data.accel_y;
+    doc["accel_z"] = sensor_data.accel_z;
+    doc["gyro_x"] = sensor_data.gyro_x;
+    doc["gyro_y"] = sensor_data.gyro_y;
+    doc["gyro_z"] = sensor_data.gyro_z;
+    doc["pressure"] = sensor_data.pressure;
 
-    doc["timestamp"] = data.timestamp;
-    doc["accel_x"] = data.accel_x;
-    doc["accel_y"] = data.accel_y;
-    doc["accel_z"] = data.accel_z;
-    doc["gyro_x"] = data.gyro_x;
-    doc["gyro_y"] = data.gyro_y;
-    doc["gyro_z"] = data.gyro_z;
-    doc["pressure"] = data.pressure;
-    doc["heart_rate"] = data.heart_rate;
-    doc["fsr_value"] = data.fsr_value;
+    String jsonPayload;
+    serializeJson(doc, jsonPayload);
 
-    String json_string;
-    serializeJson(doc, json_string);
-    return json_string;
+    String endpoint = getEndpointURL("/api/device/sensor-stream");
+
+    HTTPClient http;
+    http.begin(endpoint);
+    http.addHeader("Content-Type", "application/json");
+    http.addHeader("X-Device-ID", WiFi.macAddress());
+
+    int httpResponseCode = http.POST(jsonPayload);
+    bool success = (httpResponseCode >= 200 && httpResponseCode < 300);
+
+    http.end();
+    return success;
 }
 
-void WiFi_Manager::updateConnectionStatus() {
-    bool prev_connected = connected;
-    connected = (WiFi.status() == WL_CONNECTED);
+String WiFiManager::getEndpointURL(const char *endpoint)
+{
+    String url = serverURL;
+    if (!url.endsWith("/"))
+    {
+        url += endpoint;
+    }
+    else
+    {
+        url += (endpoint[0] == '/') ? (endpoint + 1) : endpoint;
+    }
+    return url;
+}
 
-    if (prev_connected && !connected) {
-        Serial.println("[WiFi] Connection lost!");
-    } else if (!prev_connected && connected) {
-        Serial.println("[WiFi] Connection restored!");
+bool WiFiManager::pingServer()
+{
+    if (!isConnected())
+    {
+        Serial.println("[WiFi] Cannot ping server - WiFi not connected");
+        return false;
+    }
+
+    String endpoint = getEndpointURL("/api/health");
+
+    HTTPClient http;
+    http.begin(endpoint);
+    http.setTimeout(5000); // 5 second timeout
+
+    Serial.print("[WiFi] Pinging server: ");
+    Serial.println(endpoint);
+
+    int httpResponseCode = http.GET();
+
+    if (httpResponseCode == 200)
+    {
+        String response = http.getString();
+        Serial.println("[WiFi] ✓ Server ping successful!");
+        Serial.print("[WiFi] Response: ");
+        Serial.println(response);
+        http.end();
+        return true;
+    }
+    else
+    {
+        Serial.print("[WiFi] ✗ Server ping failed (HTTP ");
+        Serial.print(httpResponseCode);
+        Serial.println(")");
+        http.end();
+        return false;
     }
 }
 
+bool WiFiManager::testServerConnection()
+{
+    if (!isConnected())
+    {
+        Serial.println("[WiFi] Cannot test server - WiFi not connected");
+        return false;
+    }
+
+    Serial.println("\n[WiFi] ========== SERVER CONNECTION TEST ==========");
+    Serial.print("[WiFi] Server URL: ");
+    Serial.println(serverURL);
+    Serial.print("[WiFi] Device MAC: ");
+    Serial.println(WiFi.macAddress());
+
+    String endpoint = getEndpointURL("/api/health");
+
+    HTTPClient http;
+    http.begin(endpoint);
+    http.addHeader("Content-Type", "application/json");
+    http.addHeader("X-Device-ID", WiFi.macAddress());
+    http.setTimeout(5000);
+
+    // Create test JSON
+    DynamicJsonDocument doc(256);
+    doc["device_id"] = "SF-" + WiFi.macAddress();
+    doc["test"] = true;
+
+    String jsonPayload;
+    serializeJson(doc, jsonPayload);
+
+    Serial.println("[WiFi] Sending POST request to /api/health...");
+
+    int httpResponseCode = http.POST(jsonPayload);
+
+    if (httpResponseCode >= 200 && httpResponseCode < 300)
+    {
+        Serial.print("[WiFi] ✓ Server connection TEST PASSED! (HTTP ");
+        Serial.print(httpResponseCode);
+        Serial.println(")");
+
+        String response = http.getString();
+        Serial.println("[WiFi] Server response:");
+        Serial.println(response);
+
+        http.end();
+        Serial.println("[WiFi] =============================================\n");
+        return true;
+    }
+    else
+    {
+        Serial.print("[WiFi] ✗ Server connection TEST FAILED (HTTP ");
+        Serial.print(httpResponseCode);
+        Serial.println(")");
+
+        if (httpResponseCode == -1)
+        {
+            Serial.println("[WiFi] Error: Connection refused or timeout");
+            Serial.println("[WiFi] Check:");
+            Serial.println("[WiFi]   1. Web app is running (npm run dev)");
+            Serial.println("[WiFi]   2. SERVER_URL IP address is correct");
+            Serial.println("[WiFi]   3. Computer firewall allows port 3000");
+        }
+        else if (httpResponseCode == 404)
+        {
+            Serial.println("[WiFi] Error: API endpoint not found");
+            Serial.println("[WiFi] Check: Web app has /api/health endpoint");
+        }
+
+        http.end();
+        Serial.println("[WiFi] =============================================\n");
+        return false;
+    }
+}
+
+void WiFiManager::setPingInterval(unsigned long interval_ms)
+{
+    pingInterval = interval_ms;
+    Serial.print("[WiFi] Ping interval set to: ");
+    Serial.print(interval_ms);
+    Serial.println(" ms");
+}
+
+void WiFiManager::checkAndPing()
+{
+    if (!isConnected() || serverURL.length() == 0)
+    {
+        return;
+    }
+
+    unsigned long currentTime = millis();
+    if (currentTime - lastPingTime >= pingInterval)
+    {
+        lastPingTime = currentTime;
+
+        // Send status update to /api/device/status with device ID
+        HTTPClient http;
+        String endpoint = getEndpointURL("/api/device/status");
+
+        http.begin(endpoint);
+        http.addHeader("Content-Type", "application/json");
+        http.addHeader("X-Device-ID", WiFi.macAddress());
+        http.setTimeout(3000);
+
+        DynamicJsonDocument doc(256);
+        doc["device_id"] = "SF-" + WiFi.macAddress();
+        doc["wifi_rssi"] = WiFi.RSSI();
+
+        String jsonPayload;
+        serializeJson(doc, jsonPayload);
+
+        int httpResponseCode = http.POST(jsonPayload);
+
+        if (httpResponseCode >= 200 && httpResponseCode < 300)
+        {
+            Serial.print("[WiFi] Ping OK (");
+            Serial.print(httpResponseCode);
+            Serial.println(")");
+        }
+        else
+        {
+            Serial.print("[WiFi] Ping failed (");
+            Serial.print(httpResponseCode);
+            Serial.println(")");
+        }
+
+        http.end();
+    }
+}
