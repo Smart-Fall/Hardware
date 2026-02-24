@@ -1,16 +1,23 @@
 #include "BMP280_Sensor.h"
+#include "Board_Config.h"
 
 BMP280_Sensor::BMP280_Sensor(uint8_t sda, uint8_t scl)
-    : initialized(false), sda_pin(sda), scl_pin(scl),
-      baselineAltitude(0.0), seaLevelPressure(1013.25) {
+    : initialized(false),
+      sda_pin(sda == 255 ? Board_Config::getSDA() : sda),
+      scl_pin(scl == 255 ? Board_Config::getSCL() : scl),
+      baselineAltitude(0.0), seaLevelPressure(1013.25)
+{
 }
 
-bool BMP280_Sensor::begin(uint8_t address) {
+bool BMP280_Sensor::begin(uint8_t address)
+{
     Wire.begin(sda_pin, scl_pin);
 
-    if (!bmp.begin(address)) {
+    if (!bmp.begin(address))
+    {
         // Try alternate address
-        if (address == 0x76 && bmp.begin(0x77)) {
+        if (address == 0x76 && bmp.begin(0x77))
+        {
             initialized = true;
             return true;
         }
@@ -22,8 +29,10 @@ bool BMP280_Sensor::begin(uint8_t address) {
     return true;
 }
 
-void BMP280_Sensor::configure() {
-    if (!initialized) return;
+void BMP280_Sensor::configure()
+{
+    if (!initialized)
+        return;
 
     bmp.setSampling(Adafruit_BMP280::MODE_NORMAL,
                     Adafruit_BMP280::SAMPLING_X2,
@@ -32,12 +41,15 @@ void BMP280_Sensor::configure() {
                     Adafruit_BMP280::STANDBY_MS_1);
 }
 
-void BMP280_Sensor::setSeaLevelPressure(float pressure_hPa) {
+void BMP280_Sensor::setSeaLevelPressure(float pressure_hPa)
+{
     seaLevelPressure = pressure_hPa;
 }
 
-void BMP280_Sensor::resetBaselineAltitude() {
-    if (!initialized) return;
+void BMP280_Sensor::resetBaselineAltitude()
+{
+    if (!initialized)
+        return;
 
     baselineAltitude = bmp.readAltitude(seaLevelPressure);
     Serial.print("Baseline altitude set to: ");
@@ -45,29 +57,36 @@ void BMP280_Sensor::resetBaselineAltitude() {
     Serial.println(" m");
 }
 
-bool BMP280_Sensor::readData(float &temperature, float &pressure, float &altitude) {
-    if (!initialized) return false;
+bool BMP280_Sensor::readData(float &temperature, float &pressure, float &altitude)
+{
+    if (!initialized)
+        return false;
 
     temperature = bmp.readTemperature();
-    pressure = bmp.readPressure() / 100.0;  // Pa to hPa
+    pressure = bmp.readPressure() / 100.0; // Pa to hPa
     altitude = bmp.readAltitude(seaLevelPressure);
 
     return true;
 }
 
-float BMP280_Sensor::getAltitudeChange() {
-    if (!initialized) return 0.0;
+float BMP280_Sensor::getAltitudeChange()
+{
+    if (!initialized)
+        return 0.0;
 
     float current_altitude = bmp.readAltitude(seaLevelPressure);
     return current_altitude - baselineAltitude;
 }
 
-bool BMP280_Sensor::isInitialized() {
+bool BMP280_Sensor::isInitialized()
+{
     return initialized;
 }
 
-void BMP280_Sensor::printInfo() {
-    if (!initialized) {
+void BMP280_Sensor::printInfo()
+{
+    if (!initialized)
+    {
         Serial.println("BMP280 not initialized");
         return;
     }
