@@ -1,4 +1,4 @@
-![SmartFall Logo](assets/logo.png){ align=center width="300" }
+![SmartFall Logo](assets/logo.png)
 
 # SmartFall Hardware Documentation
 
@@ -47,33 +47,41 @@ The system triggers multi-modal alerts (audio, haptic, visual) and sends emergen
 
 ## <svg class="heroicon" viewBox="0 0 24 24" fill="currentColor"><path d="M13.5.67s.74 2.65.74 4.8c0 2.06-1.35 3.73-3.41 3.73-2.07 0-3.63-1.67-3.63-3.73l.03-.36C5.21 7.51 4 10.3 4 13.46 4 19.22 8.7 24 15.5 24c6.8 0 11.5-4.78 11.5-10.54C27 15.7 26.92 14.9 26.54 13.9c-1.1 2.59-3.12 4.74-5.64 5.88-2.37 1.02-5.02 1.02-7.39 0-2.45-1.08-4.62-3.18-6.04-5.88"/></svg> Quick Links
 
-<div class="grid cards" markdown>
+=== "Quick Start"
 
-- **[Quick Start](getting-started/quick-start.md)**
+    **[Quick Start](getting-started/quick-start.md)**
 
-  Set up and upload firmware in 5 minutes using Arduino CLI or PlatformIO
+    Set up and upload firmware in 5 minutes using Arduino CLI or PlatformIO
 
-- **[Hardware Overview](hardware/overview.md)**
+=== "Hardware Overview"
 
-  Components, board comparison, and wiring specifications
+    **[Hardware Overview](hardware/overview.md)**
 
-- **[Algorithm Guide](algorithm/overview.md)**
+    Components, board comparison, and wiring specifications
 
-  Understand the 5-stage fall detection pipeline
+=== "Algorithm Guide"
 
-- **[API Reference](api/wifi-endpoints.md)**
+    **[Algorithm Guide](algorithm/overview.md)**
 
-  WiFi REST endpoints and BLE protocol specification
+    Understand the 5-stage fall detection pipeline
 
-- **[Component Testing](testing/component-tests.md)**
+=== "API Reference"
 
-  Test individual sensors and modules
+    **[API Reference](api/wifi-endpoints.md)**
 
-- **[Troubleshooting](troubleshooting.md)**
+    WiFi REST endpoints and BLE protocol specification
 
-  10 common issues and solutions
+=== "Component Testing"
 
-</div>
+    **[Component Testing](testing/component-tests.md)**
+
+    Test individual sensors and modules
+
+=== "Troubleshooting"
+
+    **[Troubleshooting](troubleshooting.md)**
+
+    10 common issues and solutions
 
 ## <svg class="heroicon" viewBox="0 0 24 24" fill="currentColor"><path d="M5 9.2h3V19H5zM10.6 5h2.8v14h-2.8zm5.6 8H19v6h-2.8z"/></svg> System Architecture
 
