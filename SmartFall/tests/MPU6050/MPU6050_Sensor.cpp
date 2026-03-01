@@ -13,13 +13,19 @@ MPU6050_Sensor::MPU6050_Sensor(uint8_t sda, uint8_t scl)
 bool MPU6050_Sensor::begin() {
     Wire.begin(sda_pin, scl_pin);
 
-    if (!mpu.begin()) {
-        Serial.println("Failed to initialize MPU6050");
-        return false;
+    for (uint8_t attempt = 0; attempt < MAX_RETRIES; attempt++) {
+        if (mpu.begin()) {
+            initialized = true;
+            return true;
+        }
+        if (attempt < MAX_RETRIES - 1) {
+            Serial.printf("[MPU6050] Init retry %d/%d\n", attempt + 1, MAX_RETRIES);
+            delay(RETRY_DELAY_MS);
+        }
     }
 
-    initialized = true;
-    return true;
+    Serial.println("[MPU6050] Failed to initialize - all retries failed");
+    return false;
 }
 
 void MPU6050_Sensor::configure(mpu6050_accel_range_t accel_range,
@@ -37,31 +43,61 @@ bool MPU6050_Sensor::readData(float &accel_x, float &accel_y, float &accel_z,
                                float &temp) {
     if (!initialized) return false;
 
-    sensors_event_t a, g, t;
-    mpu.getEvent(&a, &g, &t);
+    for (uint8_t attempt = 0; attempt < MAX_RETRIES; attempt++) {
+        try {
+            sensors_event_t a, g, t;
+            mpu.getEvent(&a, &g, &t);
 
-    accel_x = a.acceleration.x / 9.81;  // Convert to g
-    accel_y = a.acceleration.y / 9.81;
-    accel_z = a.acceleration.z / 9.81;
+            accel_x = a.acceleration.x / 9.81;  // Convert to g
+            accel_y = a.acceleration.y / 9.81;
+            accel_z = a.acceleration.z / 9.81;
 
-    gyro_x = g.gyro.x;
-    gyro_y = g.gyro.y;
-    gyro_z = g.gyro.z;
+            gyro_x = g.gyro.x;
+            gyro_y = g.gyro.y;
+            gyro_z = g.gyro.z;
 
-    // Apply calibration offsets if calibrated
-    if (calibrated) {
-        accel_x -= accel_offset_x;
-        accel_y -= accel_offset_y;
-        accel_z -= accel_offset_z;
+            temp = t.temperature;
 
-        gyro_x -= gyro_offset_x;
-        gyro_y -= gyro_offset_y;
-        gyro_z -= gyro_offset_z;
+            // Check for stale data (same values repeatedly = sensor frozen)
+            if (accel_x == last_accel_x && accel_y == last_accel_y && accel_z == last_accel_z) {
+                stale_count++;
+                if (stale_count >= STALE_THRESHOLD) {
+                    Serial.printf("[MPU6050] Stale data detected after %d identical reads, resetting sensor...\n", STALE_THRESHOLD);
+                    stale_count = 0;
+                    // Reset by reinitializing
+                    begin();
+                    return false;  // Discard this read, retry on next call
+                }
+            } else {
+                stale_count = 0;  // Reset counter if data changed
+                last_accel_x = accel_x;
+                last_accel_y = accel_y;
+                last_accel_z = accel_z;
+            }
+
+            // Apply calibration offsets if calibrated
+            if (calibrated) {
+                accel_x -= accel_offset_x;
+                accel_y -= accel_offset_y;
+                accel_z -= accel_offset_z;
+
+                gyro_x -= gyro_offset_x;
+                gyro_y -= gyro_offset_y;
+                gyro_z -= gyro_offset_z;
+            }
+
+            return true;
+        } catch (...) {
+            if (attempt < MAX_RETRIES - 1) {
+                Serial.printf("[MPU6050] I2C error on attempt %d/%d, retrying...\n", attempt + 1, MAX_RETRIES);
+                delay(RETRY_DELAY_MS);
+            } else {
+                Serial.printf("[MPU6050] I2C error - all %d retry attempts failed\n", MAX_RETRIES);
+                return false;
+            }
+        }
     }
-
-    temp = t.temperature;
-
-    return true;
+    return false;
 }
 
 void MPU6050_Sensor::calibrate(uint16_t samples) {

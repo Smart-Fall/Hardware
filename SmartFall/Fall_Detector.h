@@ -5,8 +5,7 @@
 #include "Config.h"
 #include <Arduino.h>
 
-class FallDetector
-{
+class FallDetector {
 private:
     // Detection state variables
     FallStatus_t current_status;
@@ -53,19 +52,19 @@ public:
 
     // Core functions
     bool init();
-    void processSensorData(SensorData_t &data);
+    void processSensorData(SensorData_t& data);
     FallStatus_t getCurrentStatus();
     void resetDetection();
     bool isMonitoring();
 
     // Configuration functions
-    void setThresholds(DetectionThresholds_t &new_thresholds);
+    void setThresholds(DetectionThresholds_t& new_thresholds);
     DetectionThresholds_t getThresholds();
     void enableMonitoring();
     void disableMonitoring();
 
     // Data access functions
-    SensorData_t *getSensorHistory();
+    SensorData_t* getSensorHistory();
     uint8_t getHistoryCount();
     float getFreefallDuration();
     float getMaxImpact();
@@ -74,20 +73,20 @@ public:
     // Debug functions
     void printStatus();
     void printStageDetails();
-    const char *getStatusString(FallStatus_t status);
+    const char* getStatusString(FallStatus_t status);
 
 private:
     // Stage detection functions
-    bool checkStage1_FreeFall(SensorData_t &data);
-    bool checkStage2_Impact(SensorData_t &data);
-    bool checkStage3_Rotation(SensorData_t &data);
-    bool checkStage4_Inactivity(SensorData_t &data);
+    bool checkStage1_FreeFall(SensorData_t& data);
+    bool checkStage2_Impact(SensorData_t& data);
+    bool checkStage3_Rotation(SensorData_t& data);
+    bool checkStage4_Inactivity(SensorData_t& data);
 
     // Analysis helper functions
-    float calculateTotalAcceleration(SensorData_t &data);
-    float calculateAngularMagnitude(SensorData_t &data);
+    float calculateTotalAcceleration(SensorData_t& data);
+    float calculateAngularMagnitude(SensorData_t& data);
     bool isWithinDetectionWindow();
-    void addToHistory(SensorData_t &data);
+    void addToHistory(SensorData_t& data);
     void resetStageVariables();
 
     // Timeout and validation functions

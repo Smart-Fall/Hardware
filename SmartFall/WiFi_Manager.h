@@ -3,11 +3,11 @@
 
 #include <WiFi.h>
 #include <HTTPClient.h>
+#include <WiFiClient.h>
 #include <WiFiClientSecure.h>
 #include <Arduino.h>
-#include "Data_Types.h"
 
-class WiFiManager
+class WiFi_Manager
 {
 private:
     String ssid;
@@ -15,14 +15,18 @@ private:
     String serverURL;
     unsigned long lastReconnectAttempt;
     unsigned long reconnectInterval;
-    unsigned long lastPingTime;
-    unsigned long pingInterval;
     bool autoReconnect;
     bool initialized;
+    WiFiClient plainClient;
     WiFiClientSecure secureClient;
 
+    static const uint8_t MAX_RETRIES = 3;
+    static const uint16_t RETRY_DELAY_MS = 1000;
+    static const uint8_t HTTP_MAX_RETRIES = 3;
+    static const uint16_t HTTP_RETRY_DELAY_MS = 500;
+
 public:
-    WiFiManager();
+    WiFi_Manager();
 
     // Initialization
     bool begin(const char *wifi_ssid, const char *wifi_password);
@@ -37,17 +41,7 @@ public:
     // HTTP communication
     bool sendTestMessage(const String &message);
     bool sendJSON(const String &jsonPayload);
-
-    // Emergency and data transmission
-    bool sendEmergencyAlert(const EmergencyData_t &emergency_data);
-    bool sendStatusUpdate(const SystemStatus_t &status_data);
-    bool sendSensorData(const SensorData_t &sensor_data);
-
-    // Server connectivity
-    bool pingServer();
-    bool testServerConnection();
-    void setPingInterval(unsigned long interval_ms);
-    void checkAndPing();
+    bool sendJSONToEndpoint(const String &path, const String &jsonPayload);
 
     // Utility
     void printConnectionInfo();
@@ -55,7 +49,8 @@ public:
     int getRSSI();
 
 private:
-    String getEndpointURL(const char *endpoint);
+    bool beginHTTP(HTTPClient &http, const String &url);
+    bool isHTTPS(const String &url);
 };
 
 #endif // WIFI_MANAGER_H

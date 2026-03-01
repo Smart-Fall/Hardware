@@ -27,14 +27,6 @@ BoardConfig Board_Config::detectBoard() {
   config.chip_model = chip_info.model;
 
   switch (chip_info.model) {
-    case CHIP_ESP32:
-      // ESP32 HUZZAH32 Feather
-      config.type = BOARD_ESP32_HUZZAH32;
-      config.name = "ESP32 HUZZAH32 Feather";
-      config.sda_pin = 23;
-      config.scl_pin = 22;
-      break;
-
     case CHIP_ESP32S3:
       // ESP32 Feather V2
       config.type = BOARD_ESP32_FEATHER_V2;
@@ -44,14 +36,14 @@ BoardConfig Board_Config::detectBoard() {
       break;
 
     default:
-      // Unknown board - default to V2 pins with warning
+      // Unsupported board - error message
       config.type = BOARD_UNKNOWN;
       config.name = "Unknown Board";
       config.sda_pin = 22;
       config.scl_pin = 20;
-      Serial.println("[Board_Config] WARNING: Unknown chip model detected!");
-      Serial.printf("[Board_Config] Chip model: %d\n", chip_info.model);
-      Serial.println("[Board_Config] Defaulting to ESP32 Feather V2 pins (SDA=22, SCL=20)");
+      Serial.println("[Board_Config] ERROR: This project only supports ESP32 Feather V2!");
+      Serial.printf("[Board_Config] Detected chip model: %d\n", chip_info.model);
+      Serial.println("[Board_Config] Please use an ESP32 Feather V2 (ESP32-S3) board");
       break;
   }
 

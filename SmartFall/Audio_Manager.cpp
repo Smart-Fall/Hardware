@@ -1,6 +1,6 @@
 #include "Audio_Manager.h"
 
-AudioManager::AudioManager(uint8_t pin)
+Audio_Manager::Audio_Manager(uint8_t pin)
 {
     speakerPin = pin;
     pwmChannel = 0; // Use PWM channel 0
@@ -8,23 +8,34 @@ AudioManager::AudioManager(uint8_t pin)
     initialized = false;
 }
 
-bool AudioManager::begin()
+bool Audio_Manager::begin()
 {
-    // Configure PWM for audio output (ESP32 v3.x API)
-    ledcAttach(speakerPin, 5000, 8); // pin, freq (5kHz), resolution (8-bit)
-    ledcWrite(speakerPin, 0);        // Start silent
+    for (uint8_t attempt = 0; attempt < MAX_RETRIES; attempt++)
+    {
+        // Configure PWM for audio output (ESP32 v2.x channel-based API)
+        ledcSetup(pwmChannel, 5000, 8);    // channel, freq (5kHz), resolution (8-bit)
+        ledcAttachPin(speakerPin, pwmChannel);
+        ledcWrite(pwmChannel, 0);          // Start silent
+        initialized = true;
+        Serial.println("Audio Manager initialized (PAM8302)");
+        return true;
+        if (attempt < MAX_RETRIES - 1)
+        {
+            Serial.printf("[Audio] PWM init retry %d/%d\n", attempt + 1, MAX_RETRIES);
+            delay(RETRY_DELAY_MS);
+        }
+    }
 
-    initialized = true;
-    Serial.println("Audio Manager initialized (PAM8302)");
-    return true;
+    Serial.println("[Audio] Failed to initialize PWM - all retries failed");
+    return false;
 }
 
-bool AudioManager::isInitialized()
+bool Audio_Manager::isInitialized()
 {
     return initialized;
 }
 
-void AudioManager::setVolume(uint8_t level)
+void Audio_Manager::setVolume(uint8_t level)
 {
     volume = constrain(level, 0, 100);
     Serial.print("Volume set to: ");
@@ -32,12 +43,12 @@ void AudioManager::setVolume(uint8_t level)
     Serial.println("%");
 }
 
-uint8_t AudioManager::getVolume()
+uint8_t Audio_Manager::getVolume()
 {
     return volume;
 }
 
-void AudioManager::playToneInternal(uint16_t frequency, uint32_t duration_ms)
+void Audio_Manager::playToneInternal(uint16_t frequency, uint32_t duration_ms)
 {
     if (!initialized || frequency == 0)
         return;
@@ -45,18 +56,18 @@ void AudioManager::playToneInternal(uint16_t frequency, uint32_t duration_ms)
     // Calculate duty cycle based on volume (0-255 for 8-bit)
     uint8_t dutyCycle = map(volume, 0, 100, 0, 128); // Max 50% duty cycle for square wave
 
-    ledcWriteTone(speakerPin, frequency);
-    ledcWrite(speakerPin, dutyCycle);
+    ledcWriteTone(pwmChannel, frequency);
+    ledcWrite(pwmChannel, dutyCycle);
     delay(duration_ms);
-    ledcWrite(speakerPin, 0); // Silence
+    ledcWrite(pwmChannel, 0); // Silence
 }
 
-void AudioManager::playTone(uint16_t frequency, uint32_t duration_ms)
+void Audio_Manager::playTone(uint16_t frequency, uint32_t duration_ms)
 {
     playToneInternal(frequency, duration_ms);
 }
 
-void AudioManager::playTones(uint16_t *frequencies, uint32_t *durations, uint8_t count)
+void Audio_Manager::playTones(uint16_t *frequencies, uint32_t *durations, uint8_t count)
 {
     for (uint8_t i = 0; i < count; i++)
     {
@@ -65,7 +76,7 @@ void AudioManager::playTones(uint16_t *frequencies, uint32_t *durations, uint8_t
     }
 }
 
-void AudioManager::playPattern(AlertPattern_t pattern, uint8_t repeat)
+void Audio_Manager::playPattern(AlertPattern_t pattern, uint8_t repeat)
 {
     for (uint8_t r = 0; r < repeat; r++)
     {
@@ -123,13 +134,6 @@ void AudioManager::playPattern(AlertPattern_t pattern, uint8_t repeat)
         case ALERT_PATTERN_WARNING:
             playWarningTone();
             break;
-
-        case ALERT_PATTERN_CANCEL:
-            // Descending tone pattern to indicate cancellation
-            playToneInternal(800, 100);
-            delay(50);
-            playToneInternal(600, 200);
-            break;
         }
 
         if (r < repeat - 1)
@@ -139,21 +143,21 @@ void AudioManager::playPattern(AlertPattern_t pattern, uint8_t repeat)
     }
 }
 
-void AudioManager::playConfirmationTone()
+void Audio_Manager::playConfirmationTone()
 {
     playToneInternal(1000, 100);
     delay(50);
     playToneInternal(1500, 100);
 }
 
-void AudioManager::playErrorTone()
+void Audio_Manager::playErrorTone()
 {
     playToneInternal(400, 200);
     delay(100);
     playToneInternal(300, 300);
 }
 
-void AudioManager::playWarningTone()
+void Audio_Manager::playWarningTone()
 {
     for (int i = 0; i < 3; i++)
     {
@@ -162,7 +166,7 @@ void AudioManager::playWarningTone()
     }
 }
 
-void AudioManager::playSOSSequence()
+void Audio_Manager::playSOSSequence()
 {
     // S: ... (3 short)
     for (int i = 0; i < 3; i++)
@@ -188,7 +192,7 @@ void AudioManager::playSOSSequence()
     }
 }
 
-void AudioManager::playStartupMelody()
+void Audio_Manager::playStartupMelody()
 {
     uint16_t frequencies[] = {523, 587, 659, 698, 784}; // C, D, E, F, G
     for (int i = 0; i < 5; i++)
@@ -198,7 +202,7 @@ void AudioManager::playStartupMelody()
     }
 }
 
-void AudioManager::playFallDetectedSequence()
+void Audio_Manager::playFallDetectedSequence()
 {
     // Urgent ascending pattern
     for (int i = 0; i < 3; i++)
@@ -210,7 +214,7 @@ void AudioManager::playFallDetectedSequence()
     }
 }
 
-void AudioManager::playVoiceAlert(VoiceAlert_t alert)
+void Audio_Manager::playVoiceAlert(VoiceAlert_t alert)
 {
     // Voice-like patterns using tone variations
     // These patterns mimic speech prosody with varying frequencies and durations
@@ -295,12 +299,12 @@ void AudioManager::playVoiceAlert(VoiceAlert_t alert)
     }
 }
 
-void AudioManager::stopPattern()
+void Audio_Manager::stopPattern()
 {
-    ledcWrite(speakerPin, 0);
+    ledcWrite(pwmChannel, 0);
 }
 
-void AudioManager::silence()
+void Audio_Manager::silence()
 {
-    ledcWrite(speakerPin, 0);
+    ledcWrite(pwmChannel, 0);
 }

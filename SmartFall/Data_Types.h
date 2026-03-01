@@ -4,23 +4,21 @@
 #include <Arduino.h>
 
 // Sensor data structure
-typedef struct
-{
-    float accel_x, accel_y, accel_z; // Acceleration (g)
-    float gyro_x, gyro_y, gyro_z;    // Angular velocity (°/s)
-    float pressure;                  // Barometric pressure (hPa)
-    uint16_t fsr_values[4];          // FSR readings from 4 sensors (ADC counts)
-    uint16_t fsr_value;              // Combined/average FSR for backward compatibility
-    uint16_t heart_rate;             // Heart rate (BPM) from MAX30102
-    uint8_t spo2;                    // Blood oxygen saturation (%) from MAX30102
-    float heart_rate_temperature;    // Temperature reading from MAX30102 sensor (°C)
-    uint32_t timestamp;              // Timestamp (ms)
-    bool valid;                      // Data validity flag
+typedef struct {
+    float accel_x, accel_y, accel_z;          // Acceleration (g)
+    float gyro_x, gyro_y, gyro_z;             // Angular velocity (°/s)
+    float pressure;                            // Barometric pressure (hPa)
+    uint16_t fsr_value;                        // Primary FSR reading (ADC counts)
+    uint16_t fsr_values[4];                    // Individual FSR readings [0-3]
+    uint16_t heart_rate;                       // Heart rate (BPM)
+    uint8_t spo2;                              // Blood oxygen saturation (%)
+    float heart_rate_temperature;              // MAX30102 sensor temperature (°C)
+    uint32_t timestamp;                        // Timestamp (ms)
+    bool valid;                                // Data validity flag
 } SensorData_t;
 
 // Fall detection status
-typedef enum
-{
+typedef enum {
     FALL_STATUS_MONITORING,
     FALL_STATUS_STAGE1_FREEFALL,
     FALL_STATUS_STAGE2_IMPACT,
@@ -32,8 +30,7 @@ typedef enum
 } FallStatus_t;
 
 // Confidence levels
-typedef enum
-{
+typedef enum {
     CONFIDENCE_NO_FALL = 0,
     CONFIDENCE_SUSPICIOUS = 1,
     CONFIDENCE_POTENTIAL = 2,
@@ -42,20 +39,18 @@ typedef enum
 } FallConfidence_t;
 
 // Emergency data payload
-typedef struct
-{
+typedef struct {
     uint32_t timestamp;
     FallConfidence_t confidence;
     uint8_t confidence_score;
-    SensorData_t sensor_history[100]; // 10-second history at 10Hz
+    SensorData_t sensor_history[100];  // 10-second history at 10Hz
     float battery_level;
     bool sos_triggered;
     char device_id[32];
 } EmergencyData_t;
 
 // Detection thresholds structure
-typedef struct
-{
+typedef struct {
     float freefall_threshold_g;
     float impact_threshold_g;
     float rotation_threshold_dps;
@@ -64,8 +59,7 @@ typedef struct
 } DetectionThresholds_t;
 
 // System status structure
-typedef struct
-{
+typedef struct {
     bool sensors_initialized;
     bool wifi_connected;
     bool bluetooth_connected;
@@ -75,8 +69,7 @@ typedef struct
 } SystemStatus_t;
 
 // Voice message types
-typedef enum
-{
+typedef enum {
     VOICE_FALL_DETECTED,
     VOICE_PRESS_BUTTON,
     VOICE_EMERGENCY_CONFIRMED,
@@ -84,23 +77,20 @@ typedef enum
 } VoiceMessage_t;
 
 // Contact list structure
-typedef struct
-{
+typedef struct {
     char name[32];
     char phone[16];
     char email[64];
     bool enabled;
 } Contact_t;
 
-typedef struct
-{
+typedef struct {
     Contact_t contacts[5];
     uint8_t count;
 } ContactList_t;
 
 // Configuration structure
-typedef struct
-{
+typedef struct {
     char wifi_ssid[32];
     char wifi_password[64];
     char device_name[32];
@@ -112,8 +102,7 @@ typedef struct
 } Config_t;
 
 // Status update data
-typedef struct
-{
+typedef struct {
     uint32_t timestamp;
     float battery_level;
     bool system_health;

@@ -15,8 +15,7 @@ typedef enum
     ALERT_PATTERN_SOS,
     ALERT_PATTERN_CONFIRMATION,
     ALERT_PATTERN_ERROR,
-    ALERT_PATTERN_WARNING,
-    ALERT_PATTERN_CANCEL
+    ALERT_PATTERN_WARNING
 } AlertPattern_t;
 
 // Voice-Like Alerts
@@ -31,7 +30,7 @@ typedef enum
     VOICE_ALERT_CONNECTION_LOST
 } VoiceAlert_t;
 
-class AudioManager
+class Audio_Manager
 {
 private:
     uint8_t speakerPin;
@@ -39,10 +38,13 @@ private:
     uint8_t volume; // 0-100
     bool initialized;
 
+    static const uint8_t MAX_RETRIES = 3;
+    static const uint16_t RETRY_DELAY_MS = 100;
+
     void playToneInternal(uint16_t frequency, uint32_t duration_ms);
 
 public:
-    AudioManager(uint8_t pin = SPEAKER_PIN);
+    Audio_Manager(uint8_t pin = SPEAKER_PIN);
 
     // Initialization
     bool begin();

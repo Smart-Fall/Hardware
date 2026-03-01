@@ -10,13 +10,25 @@ Audio_Manager::Audio_Manager(uint8_t pin)
 
 bool Audio_Manager::begin()
 {
-    // Configure PWM for audio output (ESP32 v3.x API)
-    ledcAttach(speakerPin, 5000, 8); // pin, freq (5kHz), resolution (8-bit)
-    ledcWrite(speakerPin, 0);        // Start silent
+    for (uint8_t attempt = 0; attempt < MAX_RETRIES; attempt++)
+    {
+        // Configure PWM for audio output (ESP32 v3.x API)
+        if (ledcAttach(speakerPin, 5000, 8)) // pin, freq (5kHz), resolution (8-bit)
+        {
+            ledcWrite(speakerPin, 0); // Start silent
+            initialized = true;
+            Serial.println("Audio Manager initialized (PAM8302)");
+            return true;
+        }
+        if (attempt < MAX_RETRIES - 1)
+        {
+            Serial.printf("[Audio] PWM init retry %d/%d\n", attempt + 1, MAX_RETRIES);
+            delay(RETRY_DELAY_MS);
+        }
+    }
 
-    initialized = true;
-    Serial.println("Audio Manager initialized (PAM8302)");
-    return true;
+    Serial.println("[Audio] Failed to initialize PWM - all retries failed");
+    return false;
 }
 
 bool Audio_Manager::isInitialized()

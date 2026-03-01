@@ -6,7 +6,6 @@
 
 // Board type enumeration
 enum BoardType {
-  BOARD_ESP32_HUZZAH32,    // ESP32 chip, SDA=GPIO 23, SCL=GPIO 22
   BOARD_ESP32_FEATHER_V2,  // ESP32-S3 chip, SDA=GPIO 22, SCL=GPIO 20
   BOARD_UNKNOWN            // Unknown board type
 };

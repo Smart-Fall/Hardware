@@ -38,6 +38,9 @@ private:
     uint8_t volume; // 0-100
     bool initialized;
 
+    static const uint8_t MAX_RETRIES = 3;
+    static const uint16_t RETRY_DELAY_MS = 100;
+
     void playToneInternal(uint16_t frequency, uint32_t duration_ms);
 
 public:

@@ -83,62 +83,87 @@ bool BLE_Server::begin(const char *device_name)
     Serial.print("Initializing BLE Server: ");
     Serial.println(deviceName);
 
-    // Initialize BLE device
-    BLEDevice::init(device_name);
+    for (uint8_t attempt = 0; attempt < MAX_RETRIES; attempt++)
+    {
+        // Initialize BLE device
+        BLEDevice::init(device_name);
 
-    // Create BLE Server
-    pServer = BLEDevice::createServer();
-    pServer->setCallbacks(new ServerCallbacks());
+        // Create BLE Server
+        pServer = BLEDevice::createServer();
+        if (pServer == nullptr)
+        {
+            if (attempt < MAX_RETRIES - 1)
+            {
+                Serial.printf("[BLE] Init retry %d/%d\n", attempt + 1, MAX_RETRIES);
+                delay(RETRY_DELAY_MS);
+            }
+            continue;
+        }
 
-    // Create BLE Service
-    pService = pServer->createService(SERVICE_UUID);
+        pServer->setCallbacks(new ServerCallbacks());
 
-    // Create Emergency Characteristic (Notify)
-    pEmergencyChar = pService->createCharacteristic(
-        EMERGENCY_CHARACTERISTIC,
-        BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY);
-    pEmergencyChar->addDescriptor(new BLE2902());
+        // Create BLE Service
+        pService = pServer->createService(SERVICE_UUID);
+        if (pService == nullptr)
+        {
+            if (attempt < MAX_RETRIES - 1)
+            {
+                Serial.printf("[BLE] Service creation retry %d/%d\n", attempt + 1, MAX_RETRIES);
+                delay(RETRY_DELAY_MS);
+            }
+            continue;
+        }
 
-    // Create Sensor Data Characteristic (Notify)
-    pSensorChar = pService->createCharacteristic(
-        SENSOR_CHARACTERISTIC,
-        BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY);
-    pSensorChar->addDescriptor(new BLE2902());
+        // Create Emergency Characteristic (Notify)
+        pEmergencyChar = pService->createCharacteristic(
+            EMERGENCY_CHARACTERISTIC,
+            BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY);
+        pEmergencyChar->addDescriptor(new BLE2902());
 
-    // Create Status Characteristic (Read/Notify)
-    pStatusChar = pService->createCharacteristic(
-        STATUS_CHARACTERISTIC,
-        BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY);
-    pStatusChar->addDescriptor(new BLE2902());
+        // Create Sensor Data Characteristic (Notify)
+        pSensorChar = pService->createCharacteristic(
+            SENSOR_CHARACTERISTIC,
+            BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY);
+        pSensorChar->addDescriptor(new BLE2902());
 
-    // Create Command Characteristic (Write)
-    pCommandChar = pService->createCharacteristic(
-        COMMAND_CHARACTERISTIC,
-        BLECharacteristic::PROPERTY_WRITE);
-    pCommandChar->setCallbacks(new CommandCallbacks());
+        // Create Status Characteristic (Read/Notify)
+        pStatusChar = pService->createCharacteristic(
+            STATUS_CHARACTERISTIC,
+            BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY);
+        pStatusChar->addDescriptor(new BLE2902());
 
-    // Create Config Characteristic (Read/Write)
-    pConfigChar = pService->createCharacteristic(
-        CONFIG_CHARACTERISTIC,
-        BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_WRITE);
+        // Create Command Characteristic (Write)
+        pCommandChar = pService->createCharacteristic(
+            COMMAND_CHARACTERISTIC,
+            BLECharacteristic::PROPERTY_WRITE);
+        pCommandChar->setCallbacks(new CommandCallbacks());
 
-    // Start the service
-    pService->start();
+        // Create Config Characteristic (Read/Write)
+        pConfigChar = pService->createCharacteristic(
+            CONFIG_CHARACTERISTIC,
+            BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_WRITE);
 
-    // Start advertising
-    BLEAdvertising *pAdvertising = BLEDevice::getAdvertising();
-    pAdvertising->addServiceUUID(SERVICE_UUID);
-    pAdvertising->setScanResponse(true);
-    pAdvertising->setMinPreferred(0x06); // Functions that help with iPhone connections issue
-    pAdvertising->setMinPreferred(0x12);
-    BLEDevice::startAdvertising();
+        // Start the service
+        pService->start();
 
-    Serial.println("✓ BLE Server started");
-    Serial.println("✓ Service UUID: " + String(SERVICE_UUID));
-    Serial.println("✓ Advertising started - Device is discoverable");
+        // Start advertising
+        BLEAdvertising *pAdvertising = BLEDevice::getAdvertising();
+        pAdvertising->addServiceUUID(SERVICE_UUID);
+        pAdvertising->setScanResponse(true);
+        pAdvertising->setMinPreferred(0x06); // Functions that help with iPhone connections issue
+        pAdvertising->setMinPreferred(0x12);
+        BLEDevice::startAdvertising();
 
-    initialized = true;
-    return true;
+        Serial.println("✓ BLE Server started");
+        Serial.println("✓ Service UUID: " + String(SERVICE_UUID));
+        Serial.println("✓ Advertising started - Device is discoverable");
+
+        initialized = true;
+        return true;
+    }
+
+    Serial.println("[BLE] Failed to initialize - all retries failed");
+    return false;
 }
 
 bool BLE_Server::isConnected()
@@ -155,13 +180,25 @@ bool BLE_Server::sendEmergency(const String &message)
         return false;
     }
 
-    pEmergencyChar->setValue(message.c_str());
-    pEmergencyChar->notify();
+    for (uint8_t attempt = 0; attempt < MAX_RETRIES; attempt++)
+    {
+        if (isConnected())
+        {
+            pEmergencyChar->setValue(message.c_str());
+            pEmergencyChar->notify();
+            Serial.print("[BLE] Emergency sent: ");
+            Serial.println(message);
+            return true;
+        }
+        if (attempt < MAX_RETRIES - 1)
+        {
+            Serial.printf("[BLE] sendEmergency retry %d/%d - not connected\n", attempt + 1, MAX_RETRIES);
+            delay(RETRY_DELAY_MS);
+        }
+    }
 
-    Serial.print("[BLE] Emergency sent: ");
-    Serial.println(message);
-
-    return true;
+    Serial.println("[BLE] sendEmergency failed - all retries failed");
+    return false;
 }
 
 bool BLE_Server::sendSensorData(const String &data)
@@ -172,10 +209,23 @@ bool BLE_Server::sendSensorData(const String &data)
         return false;
     }
 
-    pSensorChar->setValue(data.c_str());
-    pSensorChar->notify();
+    for (uint8_t attempt = 0; attempt < MAX_RETRIES; attempt++)
+    {
+        if (isConnected())
+        {
+            pSensorChar->setValue(data.c_str());
+            pSensorChar->notify();
+            return true;
+        }
+        if (attempt < MAX_RETRIES - 1)
+        {
+            Serial.printf("[BLE] sendSensorData retry %d/%d - not connected\n", attempt + 1, MAX_RETRIES);
+            delay(RETRY_DELAY_MS);
+        }
+    }
 
-    return true;
+    Serial.println("[BLE] sendSensorData failed - all retries failed");
+    return false;
 }
 
 bool BLE_Server::sendStatus(const String &status)
@@ -186,13 +236,25 @@ bool BLE_Server::sendStatus(const String &status)
         return false;
     }
 
-    pStatusChar->setValue(status.c_str());
-    pStatusChar->notify();
+    for (uint8_t attempt = 0; attempt < MAX_RETRIES; attempt++)
+    {
+        if (isConnected())
+        {
+            pStatusChar->setValue(status.c_str());
+            pStatusChar->notify();
+            Serial.print("[BLE] Status sent: ");
+            Serial.println(status);
+            return true;
+        }
+        if (attempt < MAX_RETRIES - 1)
+        {
+            Serial.printf("[BLE] sendStatus retry %d/%d - not connected\n", attempt + 1, MAX_RETRIES);
+            delay(RETRY_DELAY_MS);
+        }
+    }
 
-    Serial.print("[BLE] Status sent: ");
-    Serial.println(status);
-
-    return true;
+    Serial.println("[BLE] sendStatus failed - all retries failed");
+    return false;
 }
 
 void BLE_Server::printConnectionInfo()

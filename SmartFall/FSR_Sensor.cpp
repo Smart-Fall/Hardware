@@ -7,6 +7,12 @@ FSR_Sensor::FSR_Sensor(uint8_t pin)
 
 bool FSR_Sensor::begin()
 {
+    // ESP32 has GPIO 0-39; reject obviously invalid pins
+    if (analog_pin > 39) {
+        Serial.printf("[FSR] Invalid analog pin %d (must be 0-39)\n", analog_pin);
+        initialized = false;
+        return false;
+    }
     pinMode(analog_pin, INPUT);
     initialized = true;
     return true;

@@ -10,37 +10,50 @@
 // Algorithm thresholds
 #define FREEFALL_THRESHOLD_G 0.5f
 #define IMPACT_THRESHOLD_G 3.0f
-#define ROTATION_THRESHOLD_DPS 150.0f
+#define ROTATION_THRESHOLD_DPS 250.0f
 #define INACTIVITY_THRESHOLD_MS 2000
 
-// Pin Definitions (ESP32 Feather V2)
-// I2C Bus
-#define MPU6050_SDA_PIN SDA   // I2C Data (GPIO 22)
-#define MPU6050_SCL_PIN SCL   // I2C Clock (GPIO 20)
-#define BMP280_SDA_PIN SDA    // I2C Data (shared)
-#define BMP280_SCL_PIN SCL    // I2C Clock (shared)
-#define MAX30102_SDA_PIN SDA  // I2C Data (shared, address 0x57)
-#define MAX30102_SCL_PIN SCL  // I2C Clock (shared)
-#define MAX30102_RST_PIN A9   // Reset Pin (GPIO 21, MI pin)
-#define FSR1_PIN A0           // Force sensor 1 (GPIO 26)
-#define FSR2_PIN A1           // Force sensor 2 (GPIO 25)
-#define FSR3_PIN A2           // Force sensor 3 (GPIO 34, ADC1 - WiFi safe)
-#define FSR4_PIN A3           // Force sensor 4 (GPIO 39)
+// Pin Definitions (ESP32 Feather V2 / ESP32 HUZZAH32 Feather)
+// I2C Bus - Auto-detected based on board type:
+//   ESP32 HUZZAH32: SDA=GPIO 23, SCL=GPIO 22
+//   ESP32 Feather V2: SDA=GPIO 22, SCL=GPIO 20
+// Note: Actual pins are configured automatically by Board_Config utility
+#define MPU6050_SDA_PIN SDA   // I2C Data (auto-detected)
+#define MPU6050_SCL_PIN SCL   // I2C Clock (auto-detected)
+#define BMP280_SDA_PIN SDA    // I2C Data (shared, auto-detected)
+#define BMP280_SCL_PIN SCL    // I2C Clock (shared, auto-detected)
+#define FSR_ANALOG_PIN A2     // Force sensor analog input (GPIO 34, ADC1 - WiFi safe)
 #define SOS_BUTTON_PIN A8     // SOS button with pull-up (GPIO 15)
 #define SPEAKER_PIN A12       // Audio alert output (GPIO 13, PWM capable)
+#define HAPTIC_PIN A0         // Haptic motor control (GPIO 26, DAC2)
 #define VISUAL_ALERT_PIN A10  // Visual alert LED (GPIO 27)
 #define BATTERY_SENSE_PIN A13 // Battery voltage monitoring (GPIO 35, BATT_MONITOR)
 
+// MAX30102 Heart Rate Sensor Communication Configuration
+// To use UART mode: Uncomment the line below
+// To use I2C mode (default): Keep the line commented
+// #define MAX30102_USE_UART
+
+#ifdef MAX30102_USE_UART
+  // UART Configuration (Modbus RTU)
+  #define MAX30102_UART_RX_PIN 16        // GPIO 16 (Serial1 RX)
+  #define MAX30102_UART_TX_PIN 17        // GPIO 17 (Serial1 TX)
+  #define MAX30102_UART_BAUD 9600        // Default baud rate
+#else
+  // I2C Configuration (default)
+  #define MAX30102_I2C_ADDRESS 0x57
+#endif
+
 // WiFi Configuration
-#define WIFI_SSID "Mohammed network"
-#define WIFI_PASSWORD "87654321"
-#define WIFI_TIMEOUT_MS 30000
+#define WIFI_SSID "Your_WiFi_SSID"
+#define WIFI_PASSWORD "Your_WiFi_Password"
+#define WIFI_TIMEOUT_MS 10000
 #define WIFI_RECONNECT_INTERVAL_MS 30000
 #define WIFI_MAX_RECONNECT_ATTEMPTS 5
 
 // Server Configuration
-#define SERVER_URL "https://smartfall.vercel.app" // Your alert server URL
-#define SERVER_PORT 443
+#define SERVER_URL "http://your-server.com" // Your alert server URL
+#define SERVER_PORT 80
 
 // BLE Configuration
 #define BLE_DEVICE_NAME "SmartFall"

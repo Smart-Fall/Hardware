@@ -8,8 +8,7 @@
 #include "Config.h"
 
 // Alert transmission status
-typedef enum
-{
+typedef enum {
     ALERT_STATUS_PENDING,
     ALERT_STATUS_SENDING,
     ALERT_STATUS_SENT_WIFI,
@@ -19,11 +18,10 @@ typedef enum
     ALERT_STATUS_RETRY
 } AlertStatus_t;
 
-class EmergencyComms
-{
+class Emergency_Comms {
 private:
-    WiFiManager *wifi_manager;
-    SmartFallBLEServer *ble_server;
+    WiFi_Manager* wifi_manager;
+    BLE_Server* ble_server;
 
     bool wifi_enabled;
     bool ble_enabled;
@@ -41,8 +39,8 @@ private:
     bool alert_pending;
 
 public:
-    EmergencyComms(WiFiManager *wifi, SmartFallBLEServer *ble);
-    ~EmergencyComms();
+    Emergency_Comms(WiFi_Manager* wifi, BLE_Server* ble);
+    ~Emergency_Comms();
 
     // Initialization
     bool begin();
@@ -56,21 +54,21 @@ public:
     bool isBLEEnabled();
 
     // Emergency alert transmission
-    bool sendEmergencyAlert(const EmergencyData_t &emergency_data);
-    bool sendEmergencyAlert(const EmergencyData_t &emergency_data, bool urgent);
+    bool sendEmergencyAlert(const EmergencyData_t& emergency_data);
+    bool sendEmergencyAlert(const EmergencyData_t& emergency_data, bool urgent);
 
     // Status updates
-    bool sendStatusUpdate(const SystemStatus_t &status_data);
-    bool sendSensorData(const SensorData_t &sensor_data);
+    bool sendStatusUpdate(const SystemStatus_t& status_data, const char* device_id = nullptr);
+    bool sendSensorData(const SensorData_t& sensor_data, const char* device_id = nullptr);
 
     // Alert management
-    void processAlertQueue(); // Call in loop to handle retries
+    void processAlertQueue();  // Call in loop to handle retries
     AlertStatus_t getAlertStatus();
     bool isAlertPending();
     void clearPendingAlert();
 
     // Connection status
-    bool isConnected(); // Returns true if either WiFi or BLE is connected
+    bool isConnected();  // Returns true if either WiFi or BLE is connected
     bool isWiFiConnected();
     bool isBLEConnected();
 
@@ -81,8 +79,8 @@ public:
 
 private:
     // Internal transmission functions
-    bool sendViaWiFi(const EmergencyData_t &data);
-    bool sendViaBLE(const EmergencyData_t &data);
+    bool sendViaWiFi(const EmergencyData_t& data);
+    bool sendViaBLE(const EmergencyData_t& data);
     bool retryFailedAlert();
     void updateAlertStatus();
 

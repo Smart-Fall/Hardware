@@ -14,6 +14,15 @@ private:
     float baselineAltitude;
     float seaLevelPressure;
 
+    // Retry configuration for I2C communication
+    static const uint8_t MAX_RETRIES = 10;
+    static const uint16_t RETRY_DELAY_MS = 10;
+
+    // Stale data detection
+    float last_pressure = -999.0f;
+    uint8_t stale_count = 0;
+    static const uint8_t STALE_THRESHOLD = 3;  // 3 consecutive identical reads = stale
+
 public:
     BMP280_Sensor(uint8_t sda = 255, uint8_t scl = 255);
 

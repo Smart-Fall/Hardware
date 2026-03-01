@@ -1,30 +1,33 @@
 #include "Emergency_Comms.h"
 
-EmergencyComms::EmergencyComms(WiFiManager *wifi, SmartFallBLEServer *ble)
+Emergency_Comms::Emergency_Comms(WiFi_Manager* wifi, BLE_Server* ble)
     : wifi_manager(wifi), ble_server(ble), wifi_enabled(true), ble_enabled(true),
       initialized(false), current_alert_status(ALERT_STATUS_PENDING),
       retry_count(0), max_retries(3), last_alert_time(0), retry_interval(5000),
-      alert_pending(false)
-{
+      alert_pending(false) {
 }
 
-EmergencyComms::~EmergencyComms()
-{
+Emergency_Comms::~Emergency_Comms() {
     // Cleanup if needed
 }
 
-bool EmergencyComms::begin()
-{
-    if (initialized)
-    {
+bool Emergency_Comms::begin() {
+    if (initialized) {
         Serial.println("[Emergency] Already initialized");
         return true;
     }
 
-    if (wifi_manager == nullptr && ble_server == nullptr)
-    {
+    if (wifi_manager == nullptr && ble_server == nullptr) {
         Serial.println("[Emergency] ERROR: No communication modules provided!");
         return false;
+    }
+
+    // Disable protocols for which no module was provided
+    if (ble_server == nullptr) {
+        ble_enabled = false;
+    }
+    if (wifi_manager == nullptr) {
+        wifi_enabled = false;
     }
 
     Serial.println("[Emergency] Communication system initialized");
@@ -33,55 +36,44 @@ bool EmergencyComms::begin()
     return true;
 }
 
-void EmergencyComms::setMaxRetries(uint8_t retries)
-{
+void Emergency_Comms::setMaxRetries(uint8_t retries) {
     max_retries = retries;
 }
 
-void EmergencyComms::setRetryInterval(uint32_t interval_ms)
-{
+void Emergency_Comms::setRetryInterval(uint32_t interval_ms) {
     retry_interval = interval_ms;
 }
 
-void EmergencyComms::enableWiFi(bool enable)
-{
+void Emergency_Comms::enableWiFi(bool enable) {
     wifi_enabled = enable;
-    if (DEBUG_COMMUNICATION)
-    {
+    if (DEBUG_COMMUNICATION) {
         Serial.print("[Emergency] WiFi alerts: ");
         Serial.println(enable ? "enabled" : "disabled");
     }
 }
 
-void EmergencyComms::enableBLE(bool enable)
-{
+void Emergency_Comms::enableBLE(bool enable) {
     ble_enabled = enable;
-    if (DEBUG_COMMUNICATION)
-    {
+    if (DEBUG_COMMUNICATION) {
         Serial.print("[Emergency] BLE alerts: ");
         Serial.println(enable ? "enabled" : "disabled");
     }
 }
 
-bool EmergencyComms::isWiFiEnabled()
-{
+bool Emergency_Comms::isWiFiEnabled() {
     return wifi_enabled;
 }
 
-bool EmergencyComms::isBLEEnabled()
-{
+bool Emergency_Comms::isBLEEnabled() {
     return ble_enabled;
 }
 
-bool EmergencyComms::sendEmergencyAlert(const EmergencyData_t &emergency_data)
-{
+bool Emergency_Comms::sendEmergencyAlert(const EmergencyData_t& emergency_data) {
     return sendEmergencyAlert(emergency_data, true);
 }
 
-bool EmergencyComms::sendEmergencyAlert(const EmergencyData_t &emergency_data, bool urgent)
-{
-    if (!initialized)
-    {
+bool Emergency_Comms::sendEmergencyAlert(const EmergencyData_t& emergency_data, bool urgent) {
+    if (!initialized) {
         Serial.println("[Emergency] ERROR: Not initialized!");
         return false;
     }
@@ -89,7 +81,7 @@ bool EmergencyComms::sendEmergencyAlert(const EmergencyData_t &emergency_data, b
     Serial.println("\n!!! SENDING EMERGENCY ALERT !!!");
     Serial.print("Confidence Score: ");
     Serial.print(emergency_data.confidence_score);
-    Serial.println("/105");
+    Serial.println("/100");
     Serial.print("SOS Triggered: ");
     Serial.println(emergency_data.sos_triggered ? "YES" : "NO");
 
@@ -97,60 +89,44 @@ bool EmergencyComms::sendEmergencyAlert(const EmergencyData_t &emergency_data, b
     bool ble_success = false;
 
     // Try WiFi transmission
-    if (wifi_enabled && wifi_manager != nullptr)
-    {
+    if (wifi_enabled && wifi_manager != nullptr) {
         Serial.println("[Emergency] Attempting WiFi transmission...");
         wifi_success = sendViaWiFi(emergency_data);
 
-        if (wifi_success)
-        {
+        if (wifi_success) {
             Serial.println("[Emergency] ✓ WiFi transmission successful");
-        }
-        else
-        {
+        } else {
             Serial.println("[Emergency] ✗ WiFi transmission failed");
         }
     }
 
     // Try BLE transmission
-    if (ble_enabled && ble_server != nullptr)
-    {
+    if (ble_enabled && ble_server != nullptr) {
         Serial.println("[Emergency] Attempting BLE transmission...");
         ble_success = sendViaBLE(emergency_data);
 
-        if (ble_success)
-        {
+        if (ble_success) {
             Serial.println("[Emergency] ✓ BLE transmission successful");
-        }
-        else
-        {
+        } else {
             Serial.println("[Emergency] ✗ BLE transmission failed");
         }
     }
 
     // Update status based on results
-    if (wifi_success && ble_success)
-    {
+    if (wifi_success && ble_success) {
         current_alert_status = ALERT_STATUS_SENT_BOTH;
         retry_count = 0;
-    }
-    else if (wifi_success)
-    {
+    } else if (wifi_success) {
         current_alert_status = ALERT_STATUS_SENT_WIFI;
         retry_count = 0;
-    }
-    else if (ble_success)
-    {
+    } else if (ble_success) {
         current_alert_status = ALERT_STATUS_SENT_BLE;
         retry_count = 0;
-    }
-    else
-    {
+    } else {
         current_alert_status = ALERT_STATUS_FAILED;
 
         // Queue for retry if urgent
-        if (urgent && retry_count < max_retries)
-        {
+        if (urgent && retry_count < max_retries) {
             pending_alert = emergency_data;
             alert_pending = true;
             current_alert_status = ALERT_STATUS_RETRY;
@@ -169,57 +145,72 @@ bool EmergencyComms::sendEmergencyAlert(const EmergencyData_t &emergency_data, b
     return (wifi_success || ble_success);
 }
 
-bool EmergencyComms::sendStatusUpdate(const SystemStatus_t &status_data)
-{
-    if (!initialized)
-        return false;
+bool Emergency_Comms::sendStatusUpdate(const SystemStatus_t& status_data, const char* device_id) {
+    if (!initialized) return false;
 
     bool success = false;
 
-    if (wifi_enabled && wifi_manager != nullptr && wifi_manager->isConnected())
-    {
-        success |= wifi_manager->sendStatusUpdate(status_data);
+    // Create StatusData_t from SystemStatus_t
+    StatusData_t status_packet;
+    status_packet.timestamp = millis();
+    status_packet.battery_level = status_data.battery_percentage;
+    status_packet.system_health = status_data.sensors_initialized;
+    status_packet.uptime = status_data.uptime_ms;
+    strncpy(status_packet.status_message, "Status update", sizeof(status_packet.status_message));
+
+    if (wifi_enabled && wifi_manager != nullptr && wifi_manager->isConnected()) {
+        String json = "{";
+        if (device_id != nullptr) json += "\"device_id\":\"" + String(device_id) + "\",";
+        json += "\"battery_level\":" + String(status_packet.battery_level, 1);
+        json += ",\"system_health\":" + String(status_packet.system_health ? "true" : "false");
+        json += ",\"uptime\":" + String(status_packet.uptime) + "}";
+        // No hardware timestamp — server uses Date.now() for accurate wall-clock time
+        success |= wifi_manager->sendJSONToEndpoint("/api/device/status", json);
     }
 
-    if (ble_enabled && ble_server != nullptr && ble_server->isConnected())
-    {
+    if (ble_enabled && ble_server != nullptr && ble_server->isConnected()) {
         success |= ble_server->sendStatusUpdate(status_data);
     }
 
     return success;
 }
 
-bool EmergencyComms::sendSensorData(const SensorData_t &sensor_data)
-{
-    if (!initialized)
-        return false;
+bool Emergency_Comms::sendSensorData(const SensorData_t& sensor_data, const char* device_id) {
+    if (!initialized) return false;
 
     bool success = false;
 
-    if (wifi_enabled && wifi_manager != nullptr && wifi_manager->isConnected())
-    {
-        success |= wifi_manager->sendSensorData(sensor_data);
+    if (wifi_enabled && wifi_manager != nullptr && wifi_manager->isConnected()) {
+        String json = "{";
+        if (device_id != nullptr) json += "\"device_id\":\"" + String(device_id) + "\",";
+        json += "\"accel_x\":" + String(sensor_data.accel_x, 3);
+        json += ",\"accel_y\":" + String(sensor_data.accel_y, 3);
+        json += ",\"accel_z\":" + String(sensor_data.accel_z, 3);
+        json += ",\"gyro_x\":" + String(sensor_data.gyro_x, 3);
+        json += ",\"gyro_y\":" + String(sensor_data.gyro_y, 3);
+        json += ",\"gyro_z\":" + String(sensor_data.gyro_z, 3);
+        json += ",\"pressure\":" + String(sensor_data.pressure, 2);
+        json += ",\"heart_rate\":" + String(sensor_data.heart_rate);
+        json += ",\"spo2\":" + String(sensor_data.spo2) + "}";
+        // No hardware timestamp — server uses Date.now() for accurate wall-clock time
+        success |= wifi_manager->sendJSONToEndpoint("/api/device/sensor-stream", json);
     }
 
-    if (ble_enabled && ble_server != nullptr && ble_server->isStreaming())
-    {
+    if (ble_enabled && ble_server != nullptr && ble_server->isStreaming()) {
         success |= ble_server->sendSensorData(sensor_data);
     }
 
     return success;
 }
 
-void EmergencyComms::processAlertQueue()
-{
-    if (!alert_pending || current_alert_status != ALERT_STATUS_RETRY)
-    {
+void Emergency_Comms::processAlertQueue() {
+    if (!alert_pending || current_alert_status != ALERT_STATUS_RETRY) {
         return;
     }
 
     uint32_t current_time = millis();
 
-    if (current_time - last_alert_time >= retry_interval)
-    {
+    if (current_time - last_alert_time >= retry_interval) {
         retry_count++;
 
         Serial.print("[Emergency] Retry attempt ");
@@ -227,70 +218,56 @@ void EmergencyComms::processAlertQueue()
         Serial.print("/");
         Serial.println(max_retries);
 
-        if (retryFailedAlert())
-        {
+        if (retryFailedAlert()) {
             alert_pending = false;
             Serial.println("[Emergency] ✓ Retry successful!");
-        }
-        else if (retry_count >= max_retries)
-        {
+        } else if (retry_count >= max_retries) {
             alert_pending = false;
             current_alert_status = ALERT_STATUS_FAILED;
             Serial.println("[Emergency] ✗ Max retries reached, alert failed");
-        }
-        else
-        {
+        } else {
             last_alert_time = current_time;
         }
     }
 }
 
-AlertStatus_t EmergencyComms::getAlertStatus()
-{
+AlertStatus_t Emergency_Comms::getAlertStatus() {
     return current_alert_status;
 }
 
-bool EmergencyComms::isAlertPending()
-{
+bool Emergency_Comms::isAlertPending() {
     return alert_pending;
 }
 
-void EmergencyComms::clearPendingAlert()
-{
+void Emergency_Comms::clearPendingAlert() {
     alert_pending = false;
     retry_count = 0;
     current_alert_status = ALERT_STATUS_PENDING;
 }
 
-bool EmergencyComms::isConnected()
-{
+bool Emergency_Comms::isConnected() {
     return isWiFiConnected() || isBLEConnected();
 }
 
-bool EmergencyComms::isWiFiConnected()
-{
+bool Emergency_Comms::isWiFiConnected() {
     return (wifi_manager != nullptr && wifi_manager->isConnected());
 }
 
-bool EmergencyComms::isBLEConnected()
-{
+bool Emergency_Comms::isBLEConnected() {
     return (ble_server != nullptr && ble_server->isConnected());
 }
 
-void EmergencyComms::printStatus()
-{
+void Emergency_Comms::printStatus() {
     Serial.println("=== Emergency Communication Status ===");
 
-    if (wifi_manager != nullptr)
-    {
+    if (wifi_manager != nullptr) {
         Serial.print("WiFi: ");
         Serial.print(wifi_enabled ? "Enabled" : "Disabled");
         Serial.print(" | ");
         Serial.println(wifi_manager->isConnected() ? "Connected" : "Disconnected");
     }
 
-    if (ble_server != nullptr)
-    {
+    if (ble_server != nullptr) {
         Serial.print("BLE: ");
         Serial.print(ble_enabled ? "Enabled" : "Disabled");
         Serial.print(" | ");
@@ -300,8 +277,7 @@ void EmergencyComms::printStatus()
     Serial.print("Alert Status: ");
     Serial.println(getAlertStatusString(current_alert_status));
 
-    if (alert_pending)
-    {
+    if (alert_pending) {
         Serial.print("Pending Alert - Retry ");
         Serial.print(retry_count);
         Serial.print("/");
@@ -311,76 +287,72 @@ void EmergencyComms::printStatus()
     Serial.println("======================================");
 }
 
-bool EmergencyComms::isInitialized()
-{
+bool Emergency_Comms::isInitialized() {
     return initialized;
 }
 
-uint8_t EmergencyComms::getRetryCount()
-{
+uint8_t Emergency_Comms::getRetryCount() {
     return retry_count;
 }
 
 // Private helper functions
 
-bool EmergencyComms::sendViaWiFi(const EmergencyData_t &data)
-{
-    if (wifi_manager == nullptr || !wifi_manager->isConnected())
-    {
+bool Emergency_Comms::sendViaWiFi(const EmergencyData_t& data) {
+    if (wifi_manager == nullptr || !wifi_manager->isConnected()) {
         return false;
     }
 
-    return wifi_manager->sendEmergencyAlert(data);
+    // Map numeric confidence enum to string for backend
+    const char* confidenceLevelStr = "UNKNOWN";
+    switch (data.confidence) {
+        case CONFIDENCE_HIGH:      confidenceLevelStr = "HIGH";      break;
+        case CONFIDENCE_CONFIRMED: confidenceLevelStr = "CONFIRMED"; break;
+        case CONFIDENCE_POTENTIAL: confidenceLevelStr = "POTENTIAL"; break;
+        case CONFIDENCE_SUSPICIOUS:confidenceLevelStr = "SUSPICIOUS";break;
+        case CONFIDENCE_NO_FALL:   confidenceLevelStr = "NO_FALL";   break;
+    }
+
+    String json = "{\"device_id\":\"" + String(data.device_id) + "\"";
+    json += ",\"confidence_score\":" + String(data.confidence_score);
+    json += ",\"confidence_level\":\"" + String(confidenceLevelStr) + "\"";
+    json += ",\"sos_triggered\":" + String(data.sos_triggered ? "true" : "false");
+    json += ",\"battery_level\":" + String(data.battery_level, 1) + "}";
+    // No hardware timestamp — server uses Date.now() for accurate wall-clock time
+    return wifi_manager->sendJSONToEndpoint("/api/falls", json);
 }
 
-bool EmergencyComms::sendViaBLE(const EmergencyData_t &data)
-{
-    if (ble_server == nullptr || !ble_server->isConnected())
-    {
+bool Emergency_Comms::sendViaBLE(const EmergencyData_t& data) {
+    if (ble_server == nullptr || !ble_server->isConnected()) {
         return false;
     }
 
     return ble_server->sendEmergencyAlert(data);
 }
 
-bool EmergencyComms::retryFailedAlert()
-{
-    if (!alert_pending)
-    {
+bool Emergency_Comms::retryFailedAlert() {
+    if (!alert_pending) {
         return false;
     }
 
-    return sendEmergencyAlert(pending_alert, false); // Non-urgent retry
+    return sendEmergencyAlert(pending_alert, false);  // Non-urgent retry
 }
 
-void EmergencyComms::updateAlertStatus()
-{
-    if (DEBUG_COMMUNICATION)
-    {
+void Emergency_Comms::updateAlertStatus() {
+    if (DEBUG_COMMUNICATION) {
         Serial.print("[Emergency] Alert status: ");
         Serial.println(getAlertStatusString(current_alert_status));
     }
 }
 
-String EmergencyComms::getAlertStatusString(AlertStatus_t status)
-{
-    switch (status)
-    {
-    case ALERT_STATUS_PENDING:
-        return "Pending";
-    case ALERT_STATUS_SENDING:
-        return "Sending";
-    case ALERT_STATUS_SENT_WIFI:
-        return "Sent via WiFi";
-    case ALERT_STATUS_SENT_BLE:
-        return "Sent via BLE";
-    case ALERT_STATUS_SENT_BOTH:
-        return "Sent via Both";
-    case ALERT_STATUS_FAILED:
-        return "Failed";
-    case ALERT_STATUS_RETRY:
-        return "Retrying";
-    default:
-        return "Unknown";
+String Emergency_Comms::getAlertStatusString(AlertStatus_t status) {
+    switch (status) {
+        case ALERT_STATUS_PENDING:    return "Pending";
+        case ALERT_STATUS_SENDING:    return "Sending";
+        case ALERT_STATUS_SENT_WIFI:  return "Sent via WiFi";
+        case ALERT_STATUS_SENT_BLE:   return "Sent via BLE";
+        case ALERT_STATUS_SENT_BOTH:  return "Sent via Both";
+        case ALERT_STATUS_FAILED:     return "Failed";
+        case ALERT_STATUS_RETRY:      return "Retrying";
+        default:                       return "Unknown";
     }
 }

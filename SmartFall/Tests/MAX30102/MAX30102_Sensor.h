@@ -33,6 +33,15 @@ private:
     uint8_t baseline_spo2;
     bool baseline_set;
 
+    // Retry configuration for communication
+    static const uint8_t MAX_RETRIES = 10;
+    static const uint16_t RETRY_DELAY_MS = 10;
+
+    // Stale data detection
+    uint16_t last_heart_rate = 0;
+    uint8_t stale_count = 0;
+    static const uint8_t STALE_THRESHOLD = 3;  // 3 consecutive identical reads = stale
+
 public:
     #ifdef MAX30102_USE_UART
         MAX30102Sensor(uint8_t rx = 255, uint8_t tx = 255);

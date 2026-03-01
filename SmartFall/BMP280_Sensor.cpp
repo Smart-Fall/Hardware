@@ -11,8 +11,6 @@ BMP280_Sensor::BMP280_Sensor(uint8_t sda, uint8_t scl)
 
 bool BMP280_Sensor::begin(uint8_t address)
 {
-    Wire.begin(sda_pin, scl_pin);
-
     // Try primary address with retries
     for (uint8_t attempt = 0; attempt < MAX_RETRIES; attempt++)
     {
@@ -91,7 +89,8 @@ bool BMP280_Sensor::readData(float &temperature, float &pressure, float &altitud
             altitude = bmp.readAltitude(seaLevelPressure);
 
             // Check for stale data (same pressure = sensor frozen)
-            if (pressure == last_pressure) {
+            // Use epsilon comparison — float equality is unreliable for ADC noise
+            if (fabsf(pressure - last_pressure) < 0.01f) {
                 stale_count++;
                 if (stale_count >= STALE_THRESHOLD) {
                     Serial.printf("[BMP280] Stale data detected after %d identical reads, resetting sensor...\n", STALE_THRESHOLD);

@@ -16,7 +16,27 @@ uint16_t FSR_Sensor::readRaw()
 {
     if (!initialized)
         return 0;
-    return analogRead(analog_pin);
+
+    for (uint8_t attempt = 0; attempt < MAX_RETRIES; attempt++)
+    {
+        try
+        {
+            return analogRead(analog_pin);
+        }
+        catch (...)
+        {
+            if (attempt < MAX_RETRIES - 1)
+            {
+                delay(RETRY_DELAY_MS);
+            }
+            else
+            {
+                Serial.printf("[FSR] Read error - all %d retry attempts failed\n", MAX_RETRIES);
+                return 0;
+            }
+        }
+    }
+    return 0;
 }
 
 float FSR_Sensor::readForce()
@@ -24,7 +44,27 @@ float FSR_Sensor::readForce()
     if (!initialized)
         return 0.0;
 
-    uint16_t raw = analogRead(analog_pin);
+    uint16_t raw = 0;
+    for (uint8_t attempt = 0; attempt < MAX_RETRIES; attempt++)
+    {
+        try
+        {
+            raw = analogRead(analog_pin);
+            break;
+        }
+        catch (...)
+        {
+            if (attempt < MAX_RETRIES - 1)
+            {
+                delay(RETRY_DELAY_MS);
+            }
+            else
+            {
+                Serial.printf("[FSR] readForce error - all %d retry attempts failed\n", MAX_RETRIES);
+                return 0.0;
+            }
+        }
+    }
 
     // Approximate conversion to force (Newtons)
     // This is a simplified model - adjust based on your FSR datasheet

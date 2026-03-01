@@ -11,8 +11,6 @@ MPU6050_Sensor::MPU6050_Sensor(uint8_t sda, uint8_t scl)
 }
 
 bool MPU6050_Sensor::begin() {
-    Wire.begin(sda_pin, scl_pin);
-
     for (uint8_t attempt = 0; attempt < MAX_RETRIES; attempt++) {
         if (mpu.begin()) {
             initialized = true;
@@ -52,9 +50,10 @@ bool MPU6050_Sensor::readData(float &accel_x, float &accel_y, float &accel_z,
             accel_y = a.acceleration.y / 9.81;
             accel_z = a.acceleration.z / 9.81;
 
-            gyro_x = g.gyro.x;
-            gyro_y = g.gyro.y;
-            gyro_z = g.gyro.z;
+            // Adafruit library returns rad/s; convert to °/s to match thresholds
+            gyro_x = g.gyro.x * (180.0f / M_PI);
+            gyro_y = g.gyro.y * (180.0f / M_PI);
+            gyro_z = g.gyro.z * (180.0f / M_PI);
 
             temp = t.temperature;
 
@@ -124,9 +123,10 @@ void MPU6050_Sensor::calibrate(uint16_t samples) {
         sum_accel_y += a.acceleration.y / 9.81;
         sum_accel_z += a.acceleration.z / 9.81;
 
-        sum_gyro_x += g.gyro.x;
-        sum_gyro_y += g.gyro.y;
-        sum_gyro_z += g.gyro.z;
+        // Accumulate in °/s to match readData() output units
+        sum_gyro_x += g.gyro.x * (180.0f / M_PI);
+        sum_gyro_y += g.gyro.y * (180.0f / M_PI);
+        sum_gyro_z += g.gyro.z * (180.0f / M_PI);
 
         delay(5);  // Small delay between samples
     }
@@ -144,7 +144,7 @@ void MPU6050_Sensor::calibrate(uint16_t samples) {
     calibrated = true;
 
     Serial.println("MPU6050 Calibration complete!");
-    Serial.print("Gyro offsets (rad/s): X=");
+    Serial.print("Gyro offsets (°/s): X=");
     Serial.print(gyro_offset_x, 4);
     Serial.print(", Y=");
     Serial.print(gyro_offset_y, 4);

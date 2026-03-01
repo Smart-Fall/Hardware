@@ -11,10 +11,11 @@
  */
 
 #include <esp_mac.h> // For MAC address functions in ESP32 core 3.x
-#include "SmartFall/utils/Board_Config.h"
-#include "MPU6050.h"
-#include "BMP280.h"
-#include "FSR.h"
+#include <Wire.h>
+#include "Board_Config.h"
+#include "MPU6050_Sensor.h"
+#include "BMP280_Sensor.h"
+#include "FSR_Sensor.h"
 #include "MAX30102_Sensor.h"
 #include "Fall_Detector.h"
 #include "Confidence_Scorer.h"
@@ -25,32 +26,34 @@
 #include "Data_Types.h"
 
 // Sensor instances
-MPU6050Sensor imuSensor;
-BMP280Sensor pressureSensor;
+MPU6050_Sensor imuSensor;
+BMP280_Sensor pressureSensor;
 MAX30102Sensor heartRateSensor;
-FSRSensor fsr1(FSR1_PIN);
-FSRSensor fsr2(FSR2_PIN);
-FSRSensor fsr3(FSR3_PIN);
-FSRSensor fsr4(FSR4_PIN);
+FSR_Sensor fsr4(FSR_ANALOG_PIN);
 
 // Detection system
 FallDetector fallDetector;
 ConfidenceScorer confidenceScorer;
 
 // Communication system
-WiFiManager wifiManager;
-EmergencyComms emergencyComms(&wifiManager, nullptr);
+WiFi_Manager wifiManager;
+Emergency_Comms emergencyComms(&wifiManager, nullptr);
 
 // Audio system
-AudioManager audioManager(SPEAKER_PIN);
+Audio_Manager audioManager(SPEAKER_PIN);
 
 // System state
 SensorData_t currentSensorData;
 SystemStatus_t systemStatus;
 uint32_t lastSensorRead = 0;
 uint32_t lastStatusUpdate = 0;
+uint32_t lastSensorStream = 0;
 bool systemInitialized = false;
 bool alertActive = false;
+
+// Non-blocking alert countdown state
+uint32_t alertCountdownEnd = 0;
+bool countdownActive = false;
 
 // Device ID (MAC address based)
 char deviceID[32];
@@ -192,13 +195,7 @@ void loop()
       Serial.println(pressureSensor.isInitialized() ? "OK" : "ERROR");
       Serial.print("MAX30102 (Heart Rate): ");
       Serial.println(heartRateSensor.isInitialized() ? "OK" : "ERROR");
-      Serial.print("FSR1: ");
-      Serial.print(fsr1.isInitialized() ? "OK" : "ERROR");
-      Serial.print(", FSR2: ");
-      Serial.print(fsr2.isInitialized() ? "OK" : "ERROR");
-      Serial.print(", FSR3: ");
-      Serial.print(fsr3.isInitialized() ? "OK" : "ERROR");
-      Serial.print(", FSR4: ");
+      Serial.print("FSR4: ");
       Serial.println(fsr4.isInitialized() ? "OK" : "ERROR");
       Serial.print("Fall Detector: ");
       Serial.println(fallDetector.isMonitoring() ? "MONITORING" : "INACTIVE");
@@ -237,6 +234,41 @@ void loop()
     }
   }
 
+  // Handle alert countdown (non-blocking)
+  if (countdownActive)
+  {
+    static uint32_t lastBeep = 0;
+    uint32_t remaining = (alertCountdownEnd > currentTime) ? (alertCountdownEnd - currentTime) / 1000 : 0;
+
+    // Periodic beep feedback
+    if (currentTime - lastBeep >= 10000 || remaining <= 5)
+    {
+      lastBeep = currentTime;
+      audioManager.playTone(1000, 200);
+      Serial.print("Countdown: ");
+      Serial.println(remaining);
+    }
+
+    bool expired = (currentTime >= alertCountdownEnd);
+    bool confirmed = (digitalRead(SOS_BUTTON_PIN) == LOW);
+
+    if (expired || confirmed)
+    {
+      if (confirmed) Serial.println("User confirmed emergency!");
+      fallDetector.resetDetection();
+      deactivateFullAlert();
+      alertActive = false;
+      countdownActive = false;
+    }
+  }
+
+  // Send periodic sensor data stream (every 5 seconds)
+  if (currentTime - lastSensorStream >= 5000)
+  {
+    lastSensorStream = currentTime;
+    emergencyComms.sendSensorData(currentSensorData, deviceID);
+  }
+
   // Send periodic status updates
   if (currentTime - lastStatusUpdate >= 60000)
   { // Every minute
@@ -267,6 +299,9 @@ void generateDeviceID()
 void initializeSensors()
 {
   systemStatus.sensors_initialized = true;
+
+  // Initialize I2C bus once; individual sensors must not call Wire.begin()
+  Wire.begin(Board_Config::getSDA(), Board_Config::getSCL());
 
   if (!imuSensor.begin())
   {
@@ -307,41 +342,16 @@ void initializeSensors()
     heartRateSensor.configure();
   }
 
-  // Initialize all 4 FSR sensors
-  bool fsr_ok = true;
-  if (!fsr1.begin())
-  {
-    Serial.println("ERROR: Failed to initialize FSR1!");
-    fsr_ok = false;
-  }
-  if (!fsr2.begin())
-  {
-    Serial.println("ERROR: Failed to initialize FSR2!");
-    fsr_ok = false;
-  }
-  if (!fsr3.begin())
-  {
-    Serial.println("ERROR: Failed to initialize FSR3!");
-    fsr_ok = false;
-  }
+  // Initialize FSR4 sensor
   if (!fsr4.begin())
   {
     Serial.println("ERROR: Failed to initialize FSR4!");
-    fsr_ok = false;
-  }
-
-  if (!fsr_ok)
-  {
-    Serial.println("ERROR: One or more FSR sensors failed to initialize!");
     systemStatus.sensors_initialized = false;
     audioManager.playErrorTone();
   }
   else
   {
-    Serial.println("✓ All 4 FSR sensors initialized");
-    fsr1.calibrate();
-    fsr2.calibrate();
-    fsr3.calibrate();
+    Serial.println("✓ FSR4 sensor initialized");
     fsr4.calibrate();
   }
 
@@ -362,20 +372,7 @@ void initializeCommunication()
     Serial.println("✓ WiFi connected");
     audioManager.playConfirmationTone();
 
-    // Test server connection
-    delay(1000); // Give WiFi a moment to stabilize
-    Serial.println("\n[WiFi] Testing server connection...");
-    if (wifiManager.testServerConnection())
-    {
-      Serial.println("✓ Server connection verified - Ready to send data!");
-      audioManager.playConfirmationTone();
-    }
-    else
-    {
-      Serial.println("✗ Server connection failed - Check web app is running!");
-      Serial.println("    Device will retry automatically when sending data.");
-      audioManager.playErrorTone();
-    }
+    Serial.println("✓ WiFi connected - Ready to send data!");
   }
   else
   {
@@ -476,41 +473,16 @@ void readSensors()
     currentSensorData.heart_rate_temperature = 0.0f;
   }
 
-  // Read all 4 force sensors (FSR)
-  if (fsr1.isInitialized() && fsr2.isInitialized() &&
-      fsr3.isInitialized() && fsr4.isInitialized())
+  // Read FSR4 force sensor
+  if (fsr4.isInitialized())
   {
-    currentSensorData.fsr_values[0] = fsr1.readRaw();
-    currentSensorData.fsr_values[1] = fsr2.readRaw();
-    currentSensorData.fsr_values[2] = fsr3.readRaw();
     currentSensorData.fsr_values[3] = fsr4.readRaw();
-
-    // Calculate combined FSR metric:
-    // - Use maximum value (detects impact on any sensor)
-    // - Also store average for general pressure detection
-    uint16_t max_fsr = max(max(currentSensorData.fsr_values[0], currentSensorData.fsr_values[1]),
-                           max(currentSensorData.fsr_values[2], currentSensorData.fsr_values[3]));
-    uint32_t sum_fsr = currentSensorData.fsr_values[0] + currentSensorData.fsr_values[1] +
-                       currentSensorData.fsr_values[2] + currentSensorData.fsr_values[3];
-    uint16_t avg_fsr = sum_fsr / 4;
-
-    // Use max for impact detection (fall creates sudden pressure spike)
-    currentSensorData.fsr_value = max_fsr;
-
-    // Count how many sensors detect significant pressure (helps detect falls vs normal pressure)
-    uint16_t active_sensors = 0;
-    for (int i = 0; i < 4; i++)
-    {
-      if (currentSensorData.fsr_values[i] > 100)
-        active_sensors++;
-    }
+    // Use FSR4 value for impact detection
+    currentSensorData.fsr_value = currentSensorData.fsr_values[3];
   }
   else
   {
-    for (int i = 0; i < 4; i++)
-    {
-      currentSensorData.fsr_values[i] = 0;
-    }
+    currentSensorData.fsr_values[3] = 0;
     currentSensorData.fsr_value = 0;
   }
 }
@@ -521,32 +493,35 @@ void handleFallDetected()
 
   Serial.println("\n!!! FALL DETECTED !!!");
 
-  // Update confidence scorer with fall detection data
+  // Update confidence scorer with actual measured values from the fall detector
   confidenceScorer.resetScore();
   confidenceScorer.startScoring();
 
-  // Score based on detected fall stages
-  // Stage 1: Free fall (assume 100ms duration, 0.3g min)
-  confidenceScorer.addStage1Score(100.0f, 0.3f);
+  // Stage 1: Free fall — use measured duration and inferred min magnitude
+  float freefallDuration = fallDetector.getFreefallDuration();
+  confidenceScorer.addStage1Score(freefallDuration, currentSensorData.accel_x);
 
-  // Stage 2: Impact (use actual impact magnitude from detector)
-  float impact_g = 7.0f; // Typical fall impact
-  confidenceScorer.addStage2Score(impact_g, 100.0f, true);
+  // Stage 2: Impact — use actual peak impact and FSR reading
+  float impact_g = fallDetector.getMaxImpact();
+  bool fsrImpact = (currentSensorData.fsr_value > 200);
+  confidenceScorer.addStage2Score(impact_g, freefallDuration, fsrImpact);
 
-  // Stage 3: Rotation (skipped, use default)
-  confidenceScorer.addStage3Score(0.0f, 0.0f);
+  // Stage 3: Rotation — use actual peak angular velocity
+  float maxRotation = fallDetector.getMaxRotation();
+  confidenceScorer.addStage3Score(maxRotation, 0.0f);
 
-  // Stage 4: Inactivity (2000ms as configured)
-  confidenceScorer.addStage4Score(2000.0f, true);
+  // Stage 4: Inactivity — use configured threshold duration
+  confidenceScorer.addStage4Score((float)INACTIVITY_THRESHOLD_MS, true);
 
   // Add physiological validation from MAX30102 if available
-  if (heartRateSensor.isInitialized() && currentSensorData.heart_rate > 0)
-  {
-    uint16_t baseline_hr = heartRateSensor.getBaselineHeartRate();
-    confidenceScorer.addPhysiologicalScore(currentSensorData.heart_rate,
-                                           currentSensorData.spo2,
-                                           baseline_hr);
-  }
+  // TODO: Implement addPhysiologicalScore in ConfidenceScorer
+  // if (heartRateSensor.isInitialized() && currentSensorData.heart_rate > 0)
+  // {
+  //   uint16_t baseline_hr = heartRateSensor.getBaselineHeartRate();
+  //   confidenceScorer.addPhysiologicalScore(currentSensorData.heart_rate,
+  //                                          currentSensorData.spo2,
+  //                                          baseline_hr);
+  // }
 
   // Get confidence score from fall detector
   uint8_t confidence = confidenceScorer.getTotalScore();
@@ -609,40 +584,10 @@ void handleFallDetected()
   fallDetector.printStageDetails();
   confidenceScorer.printScoreBreakdown();
 
-  // User response countdown
+  // Start non-blocking countdown — loop() will handle expiry and SOS checks
   Serial.println("\n--- Countdown: Press SOS to confirm or wait to cancel ---");
-
-  if (AUDIO_ENABLE_VOICE_ALERTS)
-  {
-    delay(1000);
-    audioManager.playVoiceAlert(VOICE_ALERT_PRESS_BUTTON);
-  }
-
-  // Countdown with audio beeps
-  for (int i = COUNTDOWN_DURATION_S; i > 0; i--)
-  {
-    // Check if user cancels
-    if (digitalRead(SOS_BUTTON_PIN) == LOW)
-    {
-      Serial.println("User confirmed emergency!");
-      break;
-    }
-
-    // Countdown beep every 10 seconds
-    if (i % 10 == 0 || i <= 5)
-    {
-      audioManager.playTone(1000, 200);
-      Serial.print("Countdown: ");
-      Serial.println(i);
-    }
-
-    delay(1000);
-  }
-
-  // Reset detection
-  fallDetector.resetDetection();
-  deactivateFullAlert();
-  alertActive = false;
+  alertCountdownEnd = millis() + ((uint32_t)COUNTDOWN_DURATION_S * 1000);
+  countdownActive = true;
 }
 
 void handleSOSButton()
@@ -777,16 +722,8 @@ void printSensorData()
   Serial.print(currentSensorData.pressure, 2);
   Serial.println(" hPa");
 
-  Serial.print("FSR1: ");
-  Serial.print(currentSensorData.fsr_values[0]);
-  Serial.print(", FSR2: ");
-  Serial.print(currentSensorData.fsr_values[1]);
-  Serial.print(", FSR3: ");
-  Serial.print(currentSensorData.fsr_values[2]);
-  Serial.print(", FSR4: ");
+  Serial.print("FSR4: ");
   Serial.println(currentSensorData.fsr_values[3]);
-  Serial.print("FSR Max: ");
-  Serial.println(currentSensorData.fsr_value);
 
   if (heartRateSensor.isInitialized())
   {

@@ -14,37 +14,51 @@ bool WiFi_Manager::begin(const char *wifi_ssid, const char *wifi_password)
     ssid = String(wifi_ssid);
     password = String(wifi_password);
 
-    Serial.print("Connecting to WiFi: ");
-    Serial.println(ssid);
-
     WiFi.mode(WIFI_STA);
-    WiFi.begin(wifi_ssid, wifi_password);
 
-    unsigned long startTime = millis();
-    while (WiFi.status() != WL_CONNECTED && millis() - startTime < 10000)
+    for (uint8_t attempt = 0; attempt < MAX_RETRIES; attempt++)
     {
-        delay(500);
-        Serial.print(".");
-    }
-    Serial.println();
+        Serial.print("Connecting to WiFi: ");
+        Serial.print(ssid);
+        if (attempt > 0)
+        {
+            Serial.printf(" (attempt %d/%d)", attempt + 1, MAX_RETRIES);
+        }
+        Serial.println();
 
-    if (WiFi.status() == WL_CONNECTED)
-    {
-        Serial.println("WiFi connected successfully!");
-        Serial.print("IP Address: ");
-        Serial.println(WiFi.localIP());
-        Serial.print("Signal Strength (RSSI): ");
-        Serial.print(WiFi.RSSI());
-        Serial.println(" dBm");
-        initialized = true;
-        return true;
+        WiFi.begin(wifi_ssid, wifi_password);
+
+        unsigned long startTime = millis();
+        while (WiFi.status() != WL_CONNECTED && millis() - startTime < 10000)
+        {
+            delay(500);
+            Serial.print(".");
+        }
+        Serial.println();
+
+        if (WiFi.status() == WL_CONNECTED)
+        {
+            Serial.println("WiFi connected successfully!");
+            Serial.print("IP Address: ");
+            Serial.println(WiFi.localIP());
+            Serial.print("Signal Strength (RSSI): ");
+            Serial.print(WiFi.RSSI());
+            Serial.println(" dBm");
+            initialized = true;
+            return true;
+        }
+
+        if (attempt < MAX_RETRIES - 1)
+        {
+            Serial.printf("[WiFi] Connection failed, retry %d/%d...\n", attempt + 1, MAX_RETRIES);
+            WiFi.disconnect();
+            delay(RETRY_DELAY_MS);
+        }
     }
-    else
-    {
-        Serial.println("WiFi connection failed!");
-        initialized = false;
-        return false;
-    }
+
+    Serial.println("[WiFi] Failed to connect - all retries failed");
+    initialized = false;
+    return false;
 }
 
 void WiFi_Manager::setServerURL(const char *url)
@@ -104,33 +118,40 @@ bool WiFi_Manager::sendTestMessage(const String &message)
         return false;
     }
 
-    HTTPClient http;
-    secureClient.setInsecure();
-    http.begin(secureClient, serverURL);
-    http.addHeader("Content-Type", "text/plain");
-
     Serial.print("Sending test message to: ");
     Serial.println(serverURL);
 
-    int httpResponseCode = http.POST(message);
+    for (uint8_t attempt = 0; attempt < HTTP_MAX_RETRIES; attempt++)
+    {
+        HTTPClient http;
+        secureClient.setInsecure();
+        http.begin(secureClient, serverURL);
+        http.addHeader("Content-Type", "text/plain");
 
-    if (httpResponseCode > 0)
-    {
-        Serial.print("HTTP Response code: ");
-        Serial.println(httpResponseCode);
-        String response = http.getString();
-        Serial.print("Server response: ");
-        Serial.println(response);
+        int httpResponseCode = http.POST(message);
+
+        if (httpResponseCode > 0)
+        {
+            Serial.print("HTTP Response code: ");
+            Serial.println(httpResponseCode);
+            String response = http.getString();
+            Serial.print("Server response: ");
+            Serial.println(response);
+            http.end();
+            return true;
+        }
+
+        Serial.printf("[WiFi] sendTestMessage error %d on attempt %d/%d\n", httpResponseCode, attempt + 1, HTTP_MAX_RETRIES);
         http.end();
-        return true;
+
+        if (attempt < HTTP_MAX_RETRIES - 1)
+        {
+            delay(HTTP_RETRY_DELAY_MS);
+        }
     }
-    else
-    {
-        Serial.print("Error sending message. HTTP error code: ");
-        Serial.println(httpResponseCode);
-        http.end();
-        return false;
-    }
+
+    Serial.println("[WiFi] sendTestMessage failed - all retries failed");
+    return false;
 }
 
 bool WiFi_Manager::sendJSON(const String &jsonPayload)
@@ -147,33 +168,40 @@ bool WiFi_Manager::sendJSON(const String &jsonPayload)
         return false;
     }
 
-    HTTPClient http;
-    secureClient.setInsecure();
-    http.begin(secureClient, serverURL);
-    http.addHeader("Content-Type", "application/json");
-
     Serial.println("Sending JSON payload:");
     Serial.println(jsonPayload);
 
-    int httpResponseCode = http.POST(jsonPayload);
+    for (uint8_t attempt = 0; attempt < HTTP_MAX_RETRIES; attempt++)
+    {
+        HTTPClient http;
+        secureClient.setInsecure();
+        http.begin(secureClient, serverURL);
+        http.addHeader("Content-Type", "application/json");
 
-    if (httpResponseCode > 0)
-    {
-        Serial.print("HTTP Response code: ");
-        Serial.println(httpResponseCode);
-        String response = http.getString();
-        Serial.print("Server response: ");
-        Serial.println(response);
+        int httpResponseCode = http.POST(jsonPayload);
+
+        if (httpResponseCode > 0)
+        {
+            Serial.print("HTTP Response code: ");
+            Serial.println(httpResponseCode);
+            String response = http.getString();
+            Serial.print("Server response: ");
+            Serial.println(response);
+            http.end();
+            return true;
+        }
+
+        Serial.printf("[WiFi] sendJSON error %d on attempt %d/%d\n", httpResponseCode, attempt + 1, HTTP_MAX_RETRIES);
         http.end();
-        return true;
+
+        if (attempt < HTTP_MAX_RETRIES - 1)
+        {
+            delay(HTTP_RETRY_DELAY_MS);
+        }
     }
-    else
-    {
-        Serial.print("Error sending JSON. HTTP error code: ");
-        Serial.println(httpResponseCode);
-        http.end();
-        return false;
-    }
+
+    Serial.println("[WiFi] sendJSON failed - all retries failed");
+    return false;
 }
 
 void WiFi_Manager::printConnectionInfo()

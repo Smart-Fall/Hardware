@@ -4,13 +4,13 @@
  *
  * Wiring:
  * FSR one end -> 3.3V
- * FSR other end -> A2 (GPIO 34) and 22kΩ pull-up resistor to 3.3V
+ * FSR other end -> A4 (GPIO 35) and 22kΩ pull-up resistor to 3.3V
  * FSR signal -> 0.1µF capacitor to GND for filtering
  */
 
 #include "FSR_Sensor.h"
 
-FSR_Sensor fsr(A2);
+FSR_Sensor fsr(A4);
 
 void setup()
 {

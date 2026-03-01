@@ -52,6 +52,7 @@ if (success) {
 #define WIFI_RECONNECT_INTERVAL_MS 30000    // Try reconnect every 30s
 #define WIFI_MAX_RECONNECT_ATTEMPTS 5
 
+// Both http:// and https:// are supported — firmware auto-selects client
 #define SERVER_URL                "http://your-server.com"
 #define SERVER_PORT               80
 
@@ -62,21 +63,20 @@ if (success) {
 #### Emergency Alert Transmission
 
 ```cpp
-// Create emergency payload
+// Populated by fall detection pipeline
 EmergencyData_t emergency;
-emergency.timestamp = millis();
-emergency.confidence_score = 80;
-emergency.confidence_level = HIGH_CONFIDENCE_FALL;
-emergency.battery_level = battery_monitor.getPercentage();
-emergency.sos_triggered = false;
-emergency.device_id = getDeviceID();
+emergency.confidence_score = confidenceScorer.getTotalScore();   // 0-100
+emergency.confidence          = confidenceScorer.getConfidenceLevel(); // enum
+emergency.battery_level       = getBatteryPercentage();
+emergency.sos_triggered       = (digitalRead(SOS_BUTTON_PIN) == LOW);
+strncpy(emergency.device_id, deviceID, sizeof(emergency.device_id));
 
-// Send alert to server
-bool success = wifi_manager.sendEmergency(emergency);
+// Emergency_Comms maps enum → "HIGH" / "CONFIRMED" etc. and POSTs to /api/falls
+bool success = emergencyComms.sendEmergencyAlert(emergency);
 
 if (!success) {
     Serial.println("Emergency transmission failed, retrying...");
-    // Automatic retry logic in WiFi_Manager
+    // Automatic retry logic in Emergency_Comms
 }
 ```
 
@@ -101,113 +101,71 @@ wifi_manager.reconnect();
 wifi_manager.disconnect();
 ```
 
-### HTTP Endpoint: POST /api/emergency
+### HTTP Endpoints
 
-Emergency alert payload sent to your web server:
+Three separate endpoints receive data from the device. All timestamps are generated
+server-side — no timestamp field is sent from the hardware.
 
-**Request Headers:**
+#### POST /api/falls
+
+Fall alert payload:
+
 ```
-POST /api/emergency HTTP/1.1
+POST /api/falls HTTP/1.1
 Host: your-server.com
 Content-Type: application/json
-Content-Length: [payload_length]
 ```
 
-**Request Body (JSON):**
 ```json
 {
-  "timestamp": 1234567890000,
+  "device_id":        "SF-AABBCCDDEEFF",
   "confidence_score": 85,
-  "confidence_level": 4,
-  "battery_level": 78.5,
-  "sos_triggered": false,
-  "device_id": "SF-AABBCCDDEEFF",
-  "location": {
-    "latitude": 40.7128,
-    "longitude": -74.0060
-  },
-  "sensor_history": [
-    {
-      "timestamp": 1234567880000,
-      "accel_x": -0.2,
-      "accel_y": 0.1,
-      "accel_z": -9.5,
-      "gyro_x": 120,
-      "gyro_y": 80,
-      "gyro_z": -45,
-      "heart_rate": 95,
-      "spo2": 98
-    }
-    // ... more samples ...
-  ]
+  "confidence_level": "HIGH",
+  "sos_triggered":    false,
+  "battery_level":    78.5
 }
 ```
 
-**Expected Response:**
+`confidence_level` is a string: `NO_FALL`, `SUSPICIOUS`, `POTENTIAL`, `HIGH`, or `CONFIRMED`.
+
+**Response:**
 ```json
-{
-  "status": "received",
-  "alert_id": "unique-alert-identifier",
-  "actions": {
-    "contact_emergency_services": true,
-    "notify_contacts": true
-  }
-}
+{ "success": true }
 ```
 
-### HTTP Endpoint: POST /api/status
+#### POST /api/device/status
 
-Periodic status updates (every 60 seconds):
+Periodic heartbeat (every 60 seconds):
 
 ```json
 {
-  "timestamp": 1234567890000,
-  "device_id": "SF-AABBCCDDEEFF",
+  "device_id":     "SF-AABBCCDDEEFF",
   "battery_level": 78.5,
-  "battery_voltage": 3.8,
-  "wifi_signal": -55,
-  "ble_connected": false,
-  "system_state": "monitoring",
-  "last_activity": 5000
+  "system_health": true,
+  "uptime":        123456
 }
 ```
 
-### Example Node.js Server
+#### POST /api/device/sensor-stream
 
-```javascript
-const express = require('express');
-const app = express();
-app.use(express.json());
+Sensor readings sent every 5 seconds:
 
-app.post('/api/emergency', (req, res) => {
-  console.log('Emergency Alert Received:');
-  console.log(JSON.stringify(req.body, null, 2));
-
-  // Send SMS/Email notifications to emergency contacts
-  const alert = req.body;
-  if (alert.confidence_level >= 3) {
-    // sendEmergencyNotification(alert);
-  }
-
-  // Log to database
-  // logAlert(alert);
-
-  res.json({
-    status: 'received',
-    alert_id: Date.now().toString()
-  });
-});
-
-app.post('/api/status', (req, res) => {
-  // Log device status
-  console.log(`Device ${req.body.device_id}: Battery ${req.body.battery_level}%`);
-  res.json({ status: 'acknowledged' });
-});
-
-app.listen(3000, () => {
-  console.log('SmartFall server listening on port 3000');
-});
+```json
+{
+  "device_id":  "SF-AABBCCDDEEFF",
+  "accel_x":    -0.02,
+  "accel_y":     0.01,
+  "accel_z":     1.00,
+  "gyro_x":      1.20,
+  "gyro_y":     -0.50,
+  "gyro_z":      0.80,
+  "pressure":    101325.00,
+  "heart_rate":  72,
+  "spo2":        98
+}
 ```
+
+Unknown devices are auto-registered on first sensor-stream POST.
 
 ## Bluetooth Low Energy (BLE)
 
@@ -386,8 +344,8 @@ graph TD
     A["Emergency Event<br/>Triggered"]
 
     B["WiFi Path"]
-    B1["WiFi_Manager<br/>sendEmergency()"]
-    B2["HTTP POST<br/>/api/emergency"]
+    B1["Emergency_Comms<br/>sendEmergencyAlert()"]
+    B2["HTTP POST<br/>/api/falls"]
     B3["Retry up to 3x<br/>5s intervals"]
     B4{Success?}
     B5["Status: Success"]

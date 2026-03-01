@@ -40,6 +40,9 @@ private:
     bool initialized;
     String deviceName;
 
+    static const uint8_t MAX_RETRIES = 3;
+    static const uint16_t RETRY_DELAY_MS = 500;
+
     // Callbacks
     static void onConnect(BLE_Server *pServer);
     static void onDisconnect(BLE_Server *pServer);

@@ -18,6 +18,11 @@ private:
     bool initialized;
     WiFiClientSecure secureClient;
 
+    static const uint8_t MAX_RETRIES = 3;
+    static const uint16_t RETRY_DELAY_MS = 1000;
+    static const uint8_t HTTP_MAX_RETRIES = 3;
+    static const uint16_t HTTP_RETRY_DELAY_MS = 500;
+
 public:
     WiFi_Manager();
 

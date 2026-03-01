@@ -65,11 +65,28 @@ Complete guide for setting up your development environment for SmartFall firmwar
     code .
     ```
 
-    PlatformIO auto-discovers project configuration from `platformio.ini`
+    PlatformIO auto-discovers project configuration from `platformio.ini`.
 
-    ### 3. Library Versions (in platformio.ini)
+    > **Project layout note:** The sketch lives in `Hardware/SmartFall/`. The
+    > `platformio.ini` includes `src_dir = SmartFall` and
+    > `build_src_filter = +<*> -<Tests/> -<SmartFall/> -<Utils/>` so that test
+    > sub-sketches and utility copies are excluded from the main build.
+
+    ### 3. Key platformio.ini settings
 
     ```ini
+    [platformio]
+    src_dir = SmartFall          ; sketch folder inside Hardware/
+
+    [env:feather_esp32_v2]
+    platform = espressif32@6.3.2
+    board    = adafruit_feather_esp32_v2
+    framework = arduino
+    ; Exclude test sub-sketches and duplicate utility copies
+    build_src_filter = +<*> -<Tests/> -<SmartFall/> -<Utils/>
+    ; Custom partitions sized for 8 MB flash (2 MB app partitions)
+    board_build.partitions = partitions.csv
+
     lib_deps =
         adafruit/Adafruit MPU6050@^2.2.4
         adafruit/Adafruit Unified Sensor@^1.1.9

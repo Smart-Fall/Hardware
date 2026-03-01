@@ -10,6 +10,10 @@ private:
     bool initialized;
     uint16_t baseline_value;
 
+    // Retry configuration for sensor reads
+    static const uint8_t MAX_RETRIES = 10;
+    static const uint16_t RETRY_DELAY_MS = 5;
+
 public:
     FSR_Sensor(uint8_t pin = A2);
 

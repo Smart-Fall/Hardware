@@ -10,25 +10,27 @@ Complete specification of HTTP endpoints for SmartFall emergency alerts and stat
 #define SERVER_PORT   3000
 ```
 
-Set `SERVER_URL` to your backend server address.
+Set `SERVER_URL` to your backend server address. Both `http://` and `https://` schemes are
+supported — the firmware auto-selects a plain or TLS-secured connection based on the URL prefix.
 
 ## Endpoints Overview
 
 | Endpoint | Method | Purpose | Frequency |
 |----------|--------|---------|-----------|
-| `/api/emergency` | POST | Emergency fall alert | On fall detection |
-| `/api/status` | POST | Periodic status update | Every 60 seconds |
-| `/api/sensor` | POST | Real-time sensor data | Optional streaming |
+| `/api/falls` | POST | Emergency fall alert | On fall detection |
+| `/api/device/status` | POST | Periodic status update | Every 60 seconds |
+| `/api/device/sensor-stream` | POST | Real-time sensor data | Every 5 seconds |
 
-## POST /api/emergency
+## POST /api/falls
 
-Emergency alert triggered by high confidence fall detection.
+Emergency alert triggered by high-confidence fall detection. The server records the
+fall event and timestamps it server-side for accurate wall-clock time.
 
 ### Request
 
 **Headers:**
 ```
-POST /api/emergency HTTP/1.1
+POST /api/falls HTTP/1.1
 Host: your-server.com:3000
 Content-Type: application/json
 Content-Length: [payload_size]
@@ -38,35 +40,11 @@ Connection: close
 **Request Body (JSON):**
 ```json
 {
-  "timestamp": 1234567890000,
-  "confidence_score": 85,
-  "confidence_level": 4,
-  "battery_level": 78.5,
-  "sos_triggered": false,
   "device_id": "SF-AABBCCDDEEFF",
-  "location": {
-    "latitude": 40.7128,
-    "longitude": -74.0060
-  },
-  "sensor_history": [
-    {
-      "timestamp": 1234567800000,
-      "accel_x": -0.2,
-      "accel_y": 0.1,
-      "accel_z": -9.5,
-      "gyro_x": 120,
-      "gyro_y": 80,
-      "gyro_z": -45,
-      "pressure_pa": 101325,
-      "altitude_m": 0.0,
-      "temperature_c": 21.5,
-      "heart_rate": 95,
-      "spo2": 98,
-      "fsr_value": 2100,
-      "battery_voltage": 3.85
-    }
-    // ... more samples (up to 100) ...
-  ]
+  "confidence_score": 85,
+  "confidence_level": "HIGH",
+  "sos_triggered": false,
+  "battery_level": 75.0
 }
 ```
 
@@ -74,79 +52,66 @@ Connection: close
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `timestamp` | uint64 | Unix timestamp (milliseconds) |
-| `confidence_score` | uint8 | 0-105 score from algorithm |
-| `confidence_level` | uint8 | 1-5 (1=suspicious, 5=high confidence) |
-| `battery_level` | float | Battery percentage (0-100%) |
-| `sos_triggered` | boolean | True if manual SOS button pressed |
-| `device_id` | string | Unique device MAC address |
-| `location` | object | Optional GPS coordinates |
-| `sensor_history` | array | Last 10 seconds of sensor data |
+| `device_id` | string | Device identifier in `SF-XXXXXXXXXXXX` format |
+| `confidence_score` | uint8 | 0–100 score from algorithm |
+| `confidence_level` | string | One of: `NO_FALL`, `SUSPICIOUS`, `POTENTIAL`, `HIGH`, `CONFIRMED` |
+| `sos_triggered` | boolean | `true` if user manually pressed the SOS button |
+| `battery_level` | float | Battery percentage (0–100) |
+
+> **Note:** No timestamp is sent from the hardware. The server records `new Date()` at
+> receipt time, avoiding the inaccurate `millis()`-since-boot value the device would otherwise send.
+
+### Confidence Level Mapping
+
+| `confidence_level` | `confidence_score` range | Meaning |
+|---|---|---|
+| `NO_FALL` | < 20 | No fall detected |
+| `SUSPICIOUS` | 20–39 | Possible unusual motion |
+| `POTENTIAL` | 40–59 | Possible fall, needs confirmation |
+| `HIGH` | 60–79 | High likelihood fall |
+| `CONFIRMED` | 80–100 | Fall confirmed by all stages |
 
 ### Response
 
 **Success (200 OK):**
 ```json
 {
-  "status": "received",
-  "alert_id": "alert_20240224_123456_abc",
-  "actions": {
-    "contact_emergency_services": true,
-    "notify_contacts": true,
-    "log_event": true
-  }
+  "success": true
 }
 ```
 
 **Error (4xx/5xx):**
 ```json
 {
-  "status": "error",
-  "message": "Invalid payload",
-  "error_code": 400
+  "error": "Internal server error"
 }
 ```
 
-### Transmission Logic
+### Retry Logic
 
 ```cpp
 // Automatic retry on failure
-if (!sendToServer(emergency_data)) {
-    // Retry up to 3 times, 5 seconds apart
-    for (int i = 0; i < 3; i++) {
-        delay(5000);
-        if (sendToServer(emergency_data)) {
-            break;  // Success
-        }
-    }
+for (int i = 0; i < EMERGENCY_MAX_RETRIES; i++) {
+    if (wifi_manager.sendJSONToEndpoint("/api/falls", json)) break;
+    delay(EMERGENCY_RETRY_INTERVAL_MS);  // default 5 000 ms
 }
 ```
 
-## POST /api/status
+---
 
-Periodic status updates (every 60 seconds during normal operation).
+## POST /api/device/status
+
+Periodic status updates sent every 60 seconds during normal operation.
 
 ### Request
-
-**Headers:**
-```
-POST /api/status HTTP/1.1
-Host: your-server.com:3000
-Content-Type: application/json
-```
 
 **Request Body:**
 ```json
 {
-  "timestamp": 1234567890000,
   "device_id": "SF-AABBCCDDEEFF",
-  "battery_level": 78.5,
-  "battery_voltage": 3.85,
-  "wifi_signal": -55,
-  "ble_connected": false,
-  "system_state": "monitoring",
-  "uptime_seconds": 3600,
-  "last_fall_detection": 1234567200000
+  "battery_level": 75.0,
+  "system_health": true,
+  "uptime": 123456
 }
 ```
 
@@ -154,227 +119,136 @@ Content-Type: application/json
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `timestamp` | uint64 | Current time (ms) |
 | `device_id` | string | Device identifier |
-| `battery_level` | float | 0-100% |
-| `battery_voltage` | float | Actual voltage in Volts |
-| `wifi_signal` | int8 | RSSI signal strength (dBm) |
-| `ble_connected` | boolean | Is BLE client connected |
-| `system_state` | string | "monitoring", "alert", "testing" |
-| `uptime_seconds` | uint32 | Seconds since boot |
-| `last_fall_detection` | uint64 | Timestamp of last fall (0 if none) |
+| `battery_level` | float | 0–100% |
+| `system_health` | boolean | `true` if all sensors initialized correctly |
+| `uptime` | uint32 | Milliseconds since boot |
 
 ### Response
 
 **Success:**
 ```json
 {
-  "status": "acknowledged",
-  "server_time": 1234567890000
+  "success": true
 }
 ```
 
-## POST /api/sensor
+---
 
-Optional real-time sensor data streaming (if enabled on device).
+## POST /api/device/sensor-stream
+
+Continuous sensor data sent every 5 seconds. The backend uses this to populate
+historical graphs and update device `lastSeen`. Unknown devices are auto-registered.
 
 ### Request
-
-Sent every 1 second when streaming is enabled:
 
 ```json
 {
   "device_id": "SF-AABBCCDDEEFF",
-  "timestamp": 1234567890000,
-  "accel_x": -0.2,
-  "accel_y": 0.1,
-  "accel_z": -9.5,
-  "gyro_x": 120,
-  "gyro_y": 80,
-  "gyro_z": -45,
-  "pressure_pa": 101325,
-  "temperature_c": 21.5,
-  "heart_rate": 95,
-  "spo2": 98,
-  "fsr_value": 2100,
-  "battery_voltage": 3.85
+  "accel_x": -0.02,
+  "accel_y":  0.01,
+  "accel_z":  1.00,
+  "gyro_x":   1.20,
+  "gyro_y":  -0.50,
+  "gyro_z":   0.80,
+  "pressure": 101325.00,
+  "heart_rate": 72,
+  "spo2": 98
 }
 ```
 
-### Control via BLE Command
+### Field Descriptions
+
+| Field | Type | Unit | Description |
+|-------|------|------|-------------|
+| `device_id` | string | — | Device identifier |
+| `accel_x/y/z` | float | g | Acceleration (gravity-normalised) |
+| `gyro_x/y/z` | float | °/s | Angular velocity |
+| `pressure` | float | hPa | Barometric pressure |
+| `heart_rate` | uint16 | BPM | Heart rate (0 if sensor unavailable) |
+| `spo2` | uint8 | % | Blood oxygen (0 if sensor unavailable) |
+
+> **Auto-registration:** If the backend does not recognise `device_id`, it creates a new
+> device record automatically. Link the device to a patient via the signup form using the
+> MAC address (the system normalises it to the `SF-XXXXXXXXXXXX` format automatically).
+
+---
+
+## Device ID Format
+
+The firmware generates device IDs from the ESP32 MAC address:
 
 ```cpp
-// Mobile app sends command:
-BLE_CMD_START_STREAMING  (0x05)  // Enable 1Hz sensor streaming
-BLE_CMD_STOP_STREAMING   (0x06)  // Disable streaming
+// SmartFall.ino — generateDeviceID()
+snprintf(deviceID, sizeof(deviceID), "SF-%02X%02X%02X%02X%02X%02X",
+         mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+// Example: "SF-AABBCCDDEEFF"
 ```
 
-## Example Node.js/Express Server
+When registering a patient in the web interface, enter the full MAC address
+(e.g., `AA:BB:CC:DD:EE:FF` or `AABBCCDDEEFF`) — the backend normalises it to the
+`SF-XXXXXXXXXXXX` format automatically.
 
-Complete backend implementation:
+---
 
-```javascript
-const express = require('express');
-const app = express();
-app.use(express.json());
+## HTTPS Support
 
-// Store active alerts and devices
-const alerts = {};
-const devices = {};
-
-// Emergency Alert Endpoint
-app.post('/api/emergency', (req, res) => {
-  const alert = req.body;
-  const alertId = Date.now().toString();
-
-  console.log('🚨 EMERGENCY ALERT RECEIVED:');
-  console.log(`Device: ${alert.device_id}`);
-  console.log(`Confidence: ${alert.confidence_score}/105 (Level: ${alert.confidence_level})`);
-  console.log(`Battery: ${alert.battery_level}%`);
-
-  // Store alert
-  alerts[alertId] = {
-    ...alert,
-    received_at: new Date(),
-    status: 'pending'
-  };
-
-  // Send to emergency contacts (example)
-  if (alert.confidence_level >= 3) {
-    sendEmergencyNotification(alert);
-    callEmergencyServices(alert);
-  }
-
-  // Log to database
-  logAlertToDatabase(alert);
-
-  // Send response
-  res.json({
-    status: 'received',
-    alert_id: alertId,
-    actions: {
-      contact_emergency_services: alert.confidence_level >= 4,
-      notify_contacts: true,
-      log_event: true
-    }
-  });
-});
-
-// Status Update Endpoint
-app.post('/api/status', (req, res) => {
-  const status = req.body;
-  devices[status.device_id] = status;
-
-  console.log(`✓ Status from ${status.device_id}: Battery ${status.battery_level}%, Signal ${status.wifi_signal} dBm`);
-
-  // Check battery low condition
-  if (status.battery_level < 20) {
-    console.log('⚠️  Low battery warning for device ' + status.device_id);
-    // Send notification to user
-    notifyUserOfLowBattery(status.device_id);
-  }
-
-  res.json({
-    status: 'acknowledged',
-    server_time: Date.now()
-  });
-});
-
-// Real-time Sensor Streaming
-app.post('/api/sensor', (req, res) => {
-  const data = req.body;
-  // Store in time-series database (InfluxDB, Prometheus, etc.)
-  // storeInTimeSeries(data);
-  res.json({ status: 'ok' });
-});
-
-// Alert Query Endpoint (for mobile app)
-app.get('/api/alerts/:device_id', (req, res) => {
-  const alerts_for_device = Object.values(alerts).filter(
-    a => a.device_id === req.params.device_id
-  );
-  res.json(alerts_for_device);
-});
-
-// Start server
-app.listen(3000, () => {
-  console.log('SmartFall server running on port 3000');
-});
-
-// Helper functions
-async function sendEmergencyNotification(alert) {
-  // Send SMS/Email to emergency contacts
-  console.log(`Sending notifications for alert ${alert.device_id}...`);
-}
-
-async function callEmergencyServices(alert) {
-  console.log(`Calling emergency services for ${alert.device_id}...`);
-}
-
-function logAlertToDatabase(alert) {
-  // Save to persistent storage
-  console.log(`Logging alert to database...`);
-}
-
-function notifyUserOfLowBattery(device_id) {
-  console.log(`Notifying user about low battery for ${device_id}...`);
-}
+```cpp
+// Config.h — production
+#define SERVER_URL "https://smartfall.example.com"
 ```
 
-## Error Handling
+The firmware detects the `https://` prefix and establishes a TLS connection using
+`WiFiClientSecure`. For development, `http://` uses a plain `WiFiClient`.
 
-If server is unreachable, SmartFall automatically:
-1. Retries up to 3 times (5-second intervals)
-2. Falls back to BLE transmission
-3. Queues alert for retry on WiFi reconnect
+---
+
+## Testing with cURL
+
+```bash
+# Test fall alert endpoint
+curl -X POST http://localhost:3000/api/falls \
+  -H "Content-Type: application/json" \
+  -d '{
+    "device_id": "SF-AABBCCDDEEFF",
+    "confidence_score": 80,
+    "confidence_level": "HIGH",
+    "sos_triggered": false,
+    "battery_level": 85.0
+  }'
+
+# Test status endpoint
+curl -X POST http://localhost:3000/api/device/status \
+  -H "Content-Type: application/json" \
+  -d '{
+    "device_id": "SF-AABBCCDDEEFF",
+    "battery_level": 85.0,
+    "system_health": true,
+    "uptime": 60000
+  }'
+
+# Test sensor stream endpoint
+curl -X POST http://localhost:3000/api/device/sensor-stream \
+  -H "Content-Type: application/json" \
+  -d '{
+    "device_id": "SF-AABBCCDDEEFF",
+    "accel_x": 0.01, "accel_y": 0.0, "accel_z": 1.0,
+    "gyro_x": 0.0, "gyro_y": 0.0, "gyro_z": 0.0,
+    "pressure": 101325.0,
+    "heart_rate": 72,
+    "spo2": 98
+  }'
+```
 
 ## HTTP Status Codes
 
 | Code | Meaning | Action |
 |------|---------|--------|
-| **200** | OK | Alert received successfully |
-| **400** | Bad Request | Invalid JSON format |
+| **200** | OK | Data received successfully |
+| **400** | Bad Request | Invalid JSON or missing required field |
 | **401** | Unauthorized | Authentication required |
-| **403** | Forbidden | Access denied |
 | **500** | Server Error | Retry transmission |
 | **503** | Unavailable | Retry transmission |
-
-## HTTPS Support
-
-For production, use HTTPS:
-
-```cpp
-#define SERVER_URL "https://smartfall.example.com"
-```
-
-Requires valid SSL certificate on server.
-
-## Testing with cURL
-
-```bash
-# Test emergency endpoint
-curl -X POST http://localhost:3000/api/emergency \
-  -H "Content-Type: application/json" \
-  -d '{
-    "timestamp": 1234567890000,
-    "confidence_score": 80,
-    "confidence_level": 4,
-    "battery_level": 85,
-    "sos_triggered": false,
-    "device_id": "SF-AABBCCDDEEFF",
-    "sensor_history": []
-  }'
-
-# Test status endpoint
-curl -X POST http://localhost:3000/api/status \
-  -H "Content-Type: application/json" \
-  -d '{
-    "timestamp": 1234567890000,
-    "device_id": "SF-AABBCCDDEEFF",
-    "battery_level": 85,
-    "wifi_signal": -45
-  }'
-```
 
 ## Next Steps
 

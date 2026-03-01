@@ -13,20 +13,40 @@ bool BMP280_Sensor::begin(uint8_t address)
 {
     Wire.begin(sda_pin, scl_pin);
 
-    if (!bmp.begin(address))
+    // Try primary address with retries
+    for (uint8_t attempt = 0; attempt < MAX_RETRIES; attempt++)
     {
-        // Try alternate address
-        if (address == 0x76 && bmp.begin(0x77))
+        if (bmp.begin(address))
         {
             initialized = true;
             return true;
         }
-        Serial.println("Failed to initialize BMP280");
-        return false;
+        if (attempt < MAX_RETRIES - 1)
+        {
+            Serial.printf("[BMP280] Init retry %d/%d for address 0x%02X\n", attempt + 1, MAX_RETRIES, address);
+            delay(RETRY_DELAY_MS);
+        }
     }
 
-    initialized = true;
-    return true;
+    // Try alternate address with retries
+    uint8_t alt_address = (address == 0x76) ? 0x77 : 0x76;
+    for (uint8_t attempt = 0; attempt < MAX_RETRIES; attempt++)
+    {
+        if (bmp.begin(alt_address))
+        {
+            initialized = true;
+            Serial.printf("[BMP280] Initialized at alternate address 0x%02X\n", alt_address);
+            return true;
+        }
+        if (attempt < MAX_RETRIES - 1)
+        {
+            Serial.printf("[BMP280] Init retry %d/%d for address 0x%02X\n", attempt + 1, MAX_RETRIES, alt_address);
+            delay(RETRY_DELAY_MS);
+        }
+    }
+
+    Serial.println("[BMP280] Failed to initialize - no sensor detected at 0x76 or 0x77");
+    return false;
 }
 
 void BMP280_Sensor::configure()
@@ -62,11 +82,48 @@ bool BMP280_Sensor::readData(float &temperature, float &pressure, float &altitud
     if (!initialized)
         return false;
 
-    temperature = bmp.readTemperature();
-    pressure = bmp.readPressure() / 100.0; // Pa to hPa
-    altitude = bmp.readAltitude(seaLevelPressure);
+    for (uint8_t attempt = 0; attempt < MAX_RETRIES; attempt++)
+    {
+        try
+        {
+            temperature = bmp.readTemperature();
+            pressure = bmp.readPressure() / 100.0; // Pa to hPa
+            altitude = bmp.readAltitude(seaLevelPressure);
 
-    return true;
+            // Check for stale data (same pressure = sensor frozen)
+            if (pressure == last_pressure) {
+                stale_count++;
+                if (stale_count >= STALE_THRESHOLD) {
+                    Serial.printf("[BMP280] Stale data detected after %d identical reads, resetting sensor...\n", STALE_THRESHOLD);
+                    stale_count = 0;
+                    // Reset by reinitializing
+                    begin();
+                    return false;  // Discard this read, retry on next call
+                }
+            } else {
+                stale_count = 0;  // Reset counter if data changed
+                last_pressure = pressure;
+            }
+
+            return true;
+        }
+        catch (...)
+        {
+            // I2C communication error occurred
+            if (attempt < MAX_RETRIES - 1)
+            {
+                Serial.printf("[BMP280] I2C error on attempt %d/%d, retrying...\n", attempt + 1, MAX_RETRIES);
+                delay(RETRY_DELAY_MS);
+            }
+            else
+            {
+                Serial.printf("[BMP280] I2C error - all %d retry attempts failed\n", MAX_RETRIES);
+                return false;
+            }
+        }
+    }
+
+    return false;
 }
 
 float BMP280_Sensor::getAltitudeChange()

@@ -22,8 +22,19 @@ private:
     float accel_offset_z;
     bool calibrated;
 
+    // Retry configuration for I2C communication
+    static const uint8_t MAX_RETRIES = 10;
+    static const uint16_t RETRY_DELAY_MS = 10;
+
+    // Stale data detection
+    float last_accel_x = -999.0f;
+    float last_accel_y = -999.0f;
+    float last_accel_z = -999.0f;
+    uint8_t stale_count = 0;
+    static const uint8_t STALE_THRESHOLD = 3;  // 3 consecutive identical reads = stale
+
 public:
-    MPU6050_Sensor(uint8_t sda = 255, uint8_t scl = 255); 
+    MPU6050_Sensor(uint8_t sda = 255, uint8_t scl = 255);
 
     bool begin();
     void configure(mpu6050_accel_range_t accel_range = MPU6050_RANGE_8_G,
