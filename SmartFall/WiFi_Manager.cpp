@@ -1,4 +1,5 @@
 #include "WiFi_Manager.h"
+#include "Log_Manager.h"
 
 WiFi_Manager::WiFi_Manager()
 {
@@ -62,6 +63,9 @@ bool WiFi_Manager::begin(const char *wifi_ssid, const char *wifi_password)
             Serial.print(WiFi.RSSI());
             Serial.println(" dBm");
             initialized = true;
+            if (logManager.isReady()) {
+                logManager.log(LOG_LEVEL_INFO, LOG_CAT_WIFI, "WiFi connected");
+            }
             return true;
         }
 
@@ -75,6 +79,9 @@ bool WiFi_Manager::begin(const char *wifi_ssid, const char *wifi_password)
 
     Serial.println("[WiFi] Failed to connect - all retries failed");
     initialized = false;
+    if (logManager.isReady()) {
+        logManager.log(LOG_LEVEL_ERROR, LOG_CAT_WIFI, "WiFi connection failed");
+    }
     return false;
 }
 
@@ -284,6 +291,10 @@ bool WiFi_Manager::sendJSONToEndpoint(const String &path, const String &jsonPayl
         }
 
         Serial.printf("[WiFi] sendJSONToEndpoint error %d on attempt %d/%d\n", httpResponseCode, attempt + 1, HTTP_MAX_RETRIES);
+        if (logManager.isReady()) {
+            logManager.log(LOG_LEVEL_WARN, LOG_CAT_WIFI, "HTTP send error",
+                           (float)httpResponseCode, (float)(attempt + 1));
+        }
         http.end();
 
         if (attempt < HTTP_MAX_RETRIES - 1)

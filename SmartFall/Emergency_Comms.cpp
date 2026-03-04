@@ -1,4 +1,5 @@
 #include "Emergency_Comms.h"
+#include "Log_Manager.h"
 
 Emergency_Comms::Emergency_Comms(WiFi_Manager* wifi, BLE_Server* ble)
     : wifi_manager(wifi), ble_server(ble), wifi_enabled(true), ble_enabled(true),
@@ -95,8 +96,16 @@ bool Emergency_Comms::sendEmergencyAlert(const EmergencyData_t& emergency_data, 
 
         if (wifi_success) {
             Serial.println("[Emergency] ✓ WiFi transmission successful");
+            if (logManager.isReady()) {
+                logManager.log(LOG_LEVEL_INFO, LOG_CAT_EMERGENCY,
+                               "Emergency alert sent via WiFi");
+            }
         } else {
             Serial.println("[Emergency] ✗ WiFi transmission failed");
+            if (logManager.isReady()) {
+                logManager.log(LOG_LEVEL_ERROR, LOG_CAT_EMERGENCY,
+                               "Emergency alert WiFi send failed");
+            }
         }
     }
 
@@ -137,6 +146,11 @@ bool Emergency_Comms::sendEmergencyAlert(const EmergencyData_t& emergency_data, 
             Serial.print("/");
             Serial.print(max_retries);
             Serial.println(")");
+            if (logManager.isReady()) {
+                logManager.log(LOG_LEVEL_WARN, LOG_CAT_EMERGENCY,
+                               "Retrying emergency alert",
+                               (float)(retry_count + 1), (float)max_retries);
+            }
         }
     }
 

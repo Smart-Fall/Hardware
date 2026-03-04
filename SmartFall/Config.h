@@ -94,6 +94,11 @@
 #define DEVICE_ID_SIZE 32
 #define MESSAGE_BUFFER_SIZE 256
 
+// Remote logging configuration
+#define LOG_BATCH_INTERVAL_MS 30000 // Send log batch every 30 seconds
+#define LOG_BUFFER_SIZE 30          // Max entries in ring buffer
+#define ENABLE_REMOTE_LOGGING true  // Set false to disable sending logs to server
+
 // Debug settings
 #define DEBUG_SENSOR_DATA false
 #define DEBUG_ALGORITHM_STEPS true

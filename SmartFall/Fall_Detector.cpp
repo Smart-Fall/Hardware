@@ -1,4 +1,5 @@
 #include "Fall_Detector.h"
+#include "Log_Manager.h"
 
 FallDetector::FallDetector() : current_status(FALL_STATUS_MONITORING),
                                monitoring_active(false),
@@ -74,6 +75,12 @@ void FallDetector::processSensorData(SensorData_t& data) {
                 if (DEBUG_ALGORITHM_STEPS) {
                     Serial.println("STAGE 1: Free fall detected!");
                 }
+                if (logManager.isReady()) {
+                    logManager.log(LOG_LEVEL_INFO, LOG_CAT_FALL_DETECTION,
+                                   "Stage 1: Free fall detected",
+                                   min_acceleration_during_fall,
+                                   thresholds.freefall_threshold_g);
+                }
             }
             break;
 
@@ -88,6 +95,12 @@ void FallDetector::processSensorData(SensorData_t& data) {
                 if (DEBUG_ALGORITHM_STEPS) {
                     Serial.println("STAGE 2: Impact detected!");
                 }
+                if (logManager.isReady()) {
+                    logManager.log(LOG_LEVEL_INFO, LOG_CAT_FALL_DETECTION,
+                                   "Stage 2: Impact detected",
+                                   max_impact_acceleration,
+                                   thresholds.impact_threshold_g);
+                }
             }
             break;
 
@@ -98,6 +111,12 @@ void FallDetector::processSensorData(SensorData_t& data) {
                 stage3_start_time = millis();
                 if (DEBUG_ALGORITHM_STEPS) {
                     Serial.println("STAGE 3: Rotation detected!");
+                }
+                if (logManager.isReady()) {
+                    logManager.log(LOG_LEVEL_INFO, LOG_CAT_FALL_DETECTION,
+                                   "Stage 3: Rotation detected",
+                                   max_angular_velocity,
+                                   thresholds.rotation_threshold_dps);
                 }
             }
             break;
@@ -114,6 +133,12 @@ void FallDetector::processSensorData(SensorData_t& data) {
                 if (DEBUG_ALGORITHM_STEPS) {
                     Serial.println("STAGE 4: Inactivity detected!");
                 }
+                if (logManager.isReady()) {
+                    logManager.log(LOG_LEVEL_INFO, LOG_CAT_FALL_DETECTION,
+                                   "Stage 4: Inactivity detected",
+                                   0.0f,
+                                   (float)thresholds.inactivity_threshold_ms);
+                }
             }
             break;
 
@@ -125,11 +150,19 @@ void FallDetector::processSensorData(SensorData_t& data) {
                     if (DEBUG_ALGORITHM_STEPS) {
                         Serial.println("POTENTIAL FALL: All stages completed!");
                     }
+                    if (logManager.isReady()) {
+                        logManager.log(LOG_LEVEL_WARN, LOG_CAT_FALL_DETECTION,
+                                       "Potential fall: all stages completed");
+                    }
                 }
             } else {
                 // User recovered, reset detection
                 if (DEBUG_ALGORITHM_STEPS) {
                     Serial.println("User recovered - resetting detection");
+                }
+                if (logManager.isReady()) {
+                    logManager.log(LOG_LEVEL_INFO, LOG_CAT_FALL_DETECTION,
+                                   "User recovered - detection reset");
                 }
                 resetDetection();
             }
@@ -140,6 +173,10 @@ void FallDetector::processSensorData(SensorData_t& data) {
             current_status = FALL_STATUS_FALL_DETECTED;
             if (DEBUG_ALGORITHM_STEPS) {
                 Serial.println("FALL DETECTED: Promoting potential fall to confirmed!");
+            }
+            if (logManager.isReady()) {
+                logManager.log(LOG_LEVEL_WARN, LOG_CAT_FALL_DETECTION,
+                               "Fall confirmed: promoting from potential to detected");
             }
             break;
 
@@ -307,6 +344,10 @@ bool FallDetector::checkStageTimeouts() {
 
 void FallDetector::handleDetectionTimeout() {
     Serial.println("Detection timeout - resetting to monitoring");
+    if (logManager.isReady()) {
+        logManager.log(LOG_LEVEL_INFO, LOG_CAT_FALL_DETECTION,
+                       "Detection window timeout - resetting to monitoring");
+    }
     resetDetection();
 }
 

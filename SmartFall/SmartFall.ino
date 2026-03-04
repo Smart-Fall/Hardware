@@ -22,6 +22,7 @@
 #include "WiFi_Manager.h"
 #include "Emergency_Comms.h"
 #include "Audio_Manager.h"
+#include "Log_Manager.h"
 #include "Config.h"
 #include "Data_Types.h"
 
@@ -106,6 +107,10 @@ void setup()
   // Initialize communication modules
   Serial.println("\n--- Initializing Communication ---");
   initializeCommunication();
+
+  // Initialize remote log manager (after WiFi so it can use the connection)
+  logManager.begin(&wifiManager, deviceID);
+  logManager.log(LOG_LEVEL_INFO, LOG_CAT_SYSTEM, "SmartFall system initialized");
 
   // Initialize fall detector
   if (fallDetector.init())
@@ -283,6 +288,9 @@ void loop()
     }
   }
 
+  // Flush remote log buffer on schedule
+  logManager.flush();
+
   delay(MAIN_LOOP_DELAY_MS);
 }
 
@@ -415,6 +423,8 @@ void readSensors()
     if (total_accel < 0.1f) // Should never be this low in normal operation
     {
       Serial.println("WARNING: MPU6050Sensor sensor failure detected! Attempting reinitialization...");
+      logManager.log(LOG_LEVEL_ERROR, LOG_CAT_SENSOR,
+                     "MPU6050 failure detected - reinitializing");
       if (imuSensor.begin())
       {
         Serial.println("✓ MPU6050Sensor reinitialized successfully");
@@ -529,6 +539,11 @@ void handleFallDetected()
   Serial.print("Confidence Score: ");
   Serial.print(confidence);
   Serial.println("/100");
+
+  // Log the fall event and flush immediately so it reaches the server ASAP
+  logManager.log(LOG_LEVEL_WARN, LOG_CAT_FALL_DETECTION, "FALL DETECTED",
+                 (float)confidence, (float)HIGH_CONFIDENCE_THRESHOLD);
+  logManager.flushImmediate();
 
   // Prepare emergency data
   EmergencyData_t emergencyData;
