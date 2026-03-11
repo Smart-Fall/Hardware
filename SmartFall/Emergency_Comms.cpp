@@ -176,7 +176,7 @@ bool Emergency_Comms::sendStatusUpdate(const SystemStatus_t& status_data, const 
         String json = "{";
         if (device_id != nullptr) json += "\"device_id\":\"" + String(device_id) + "\",";
         json += "\"battery_level\":" + String(status_packet.battery_level, 1);
-        json += ",\"system_health\":" + String(status_packet.system_health ? "true" : "false");
+        json += ",\"sensors_initialized\":" + String(status_packet.system_health ? "true" : "false");
         json += ",\"uptime\":" + String(status_packet.uptime) + "}";
         // No hardware timestamp — server uses Date.now() for accurate wall-clock time
         success |= wifi_manager->sendJSONToEndpoint("/api/device/status", json);
@@ -204,6 +204,7 @@ bool Emergency_Comms::sendSensorData(const SensorData_t& sensor_data, const char
         json += ",\"gyro_y\":" + String(sensor_data.gyro_y, 3);
         json += ",\"gyro_z\":" + String(sensor_data.gyro_z, 3);
         json += ",\"pressure\":" + String(sensor_data.pressure, 2);
+        json += ",\"fsr\":" + String(sensor_data.fsr_value);
         json += ",\"heart_rate\":" + String(sensor_data.heart_rate);
         json += ",\"spo2\":" + String(sensor_data.spo2) + "}";
         // No hardware timestamp — server uses Date.now() for accurate wall-clock time
@@ -330,7 +331,19 @@ bool Emergency_Comms::sendViaWiFi(const EmergencyData_t& data) {
     json += ",\"confidence_score\":" + String(data.confidence_score);
     json += ",\"confidence_level\":\"" + String(confidenceLevelStr) + "\"";
     json += ",\"sos_triggered\":" + String(data.sos_triggered ? "true" : "false");
-    json += ",\"battery_level\":" + String(data.battery_level, 1) + "}";
+    json += ",\"battery_level\":" + String(data.battery_level, 1);
+    // Include sensor snapshot so server can store it alongside the fall record
+    const SensorData_t& s = data.sensor_history[0];
+    json += ",\"sensor_data\":{";
+    json += "\"accel_x\":" + String(s.accel_x, 3);
+    json += ",\"accel_y\":" + String(s.accel_y, 3);
+    json += ",\"accel_z\":" + String(s.accel_z, 3);
+    json += ",\"gyro_x\":" + String(s.gyro_x, 3);
+    json += ",\"gyro_y\":" + String(s.gyro_y, 3);
+    json += ",\"gyro_z\":" + String(s.gyro_z, 3);
+    json += ",\"pressure\":" + String(s.pressure, 2);
+    json += "}";
+    json += "}";
     // No hardware timestamp — server uses Date.now() for accurate wall-clock time
     return wifi_manager->sendJSONToEndpoint("/api/falls", json);
 }
