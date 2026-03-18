@@ -213,7 +213,7 @@ void loop()
     // Check fall status
     FallStatus_t status = fallDetector.getCurrentStatus();
 
-    // Log current acceleration magnitude every 2 seconds
+    // Log current acceleration magnitude and FSR every 2 seconds
     static uint32_t lastAccelLog = 0;
     if (DEBUG_ALGORITHM_STEPS && (currentTime - lastAccelLog) >= 2000)
     {
@@ -223,7 +223,11 @@ void loop()
                                currentSensorData.accel_z * currentSensorData.accel_z);
       Serial.print("[AccelMag] ");
       Serial.print(total_accel, 3);
-      Serial.print("g, Status: ");
+      Serial.print("g | [FSR] raw=");
+      Serial.print(currentSensorData.fsr_value);
+      Serial.print(" baseline=");
+      Serial.print(fsr4.getBaseline());
+      Serial.print(" | Status: ");
       Serial.println(status);
     }
 
@@ -298,7 +302,7 @@ void generateDeviceID()
 {
   uint8_t mac[6];
   esp_efuse_mac_get_default(mac);
-  snprintf(deviceID, sizeof(deviceID), "SF-%02X%02X%02X%02X%02X%02X",
+  snprintf(deviceID, sizeof(deviceID), "%02X:%02X:%02X:%02X:%02X:%02X",
            mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
   Serial.print("Device ID: ");
   Serial.println(deviceID);
@@ -415,24 +419,33 @@ void readSensors()
                        currentSensorData.gyro_z,
                        temp);
 
-    // Check for sensor failure (all zeros indicates I2C error)
-    float total_accel = sqrt(currentSensorData.accel_x * currentSensorData.accel_x +
-                             currentSensorData.accel_y * currentSensorData.accel_y +
-                             currentSensorData.accel_z * currentSensorData.accel_z);
-
-    if (total_accel < 0.1f) // Should never be this low in normal operation
+    // Check for sensor failure: readData() sets initialized=false when it
+    // detects a NACK or stale data, so check that flag rather than magnitude.
+    if (!imuSensor.isInitialized())
     {
-      Serial.println("WARNING: MPU6050Sensor sensor failure detected! Attempting reinitialization...");
-      logManager.log(LOG_LEVEL_ERROR, LOG_CAT_SENSOR,
-                     "MPU6050 failure detected - reinitializing");
-      if (imuSensor.begin())
+      static uint32_t lastReinitAttempt = 0;
+      uint32_t now = millis();
+
+      // Cooldown: don't attempt reinit more than once every 2 seconds.
+      // Loose wiring can cause rapid successive failures; without a cooldown
+      // multiple reinits stack up and corrupt the library's internal I2C state.
+      if (now - lastReinitAttempt >= 2000)
       {
-        Serial.println("✓ MPU6050Sensor reinitialized successfully");
-        imuSensor.calibrate();
-      }
-      else
-      {
-        Serial.println("ERROR: MPU6050Sensor reinitialization failed!");
+        lastReinitAttempt = now;
+        Serial.println("WARNING: MPU6050 not responding - attempting reinitialization...");
+        logManager.log(LOG_LEVEL_ERROR, LOG_CAT_SENSOR,
+                       "MPU6050 failure detected - reinitializing");
+
+        if (imuSensor.begin())
+        {
+          delay(50); // Let sensor settle before first read
+          imuSensor.configure();
+          Serial.println("✓ MPU6050 reinitialized successfully");
+        }
+        else
+        {
+          Serial.println("ERROR: MPU6050 reinitialization failed!");
+        }
       }
     }
   }
@@ -507,9 +520,9 @@ void handleFallDetected()
   confidenceScorer.resetScore();
   confidenceScorer.startScoring();
 
-  // Stage 1: Free fall — use measured duration and inferred min magnitude
+  // Stage 1: Free fall — use measured duration and minimum accel magnitude during fall
   float freefallDuration = fallDetector.getFreefallDuration();
-  confidenceScorer.addStage1Score(freefallDuration, currentSensorData.accel_x);
+  confidenceScorer.addStage1Score(freefallDuration, fallDetector.getMinAcceleration());
 
   // Stage 2: Impact — use actual peak impact and FSR reading
   float impact_g = fallDetector.getMaxImpact();
@@ -520,8 +533,8 @@ void handleFallDetected()
   float maxRotation = fallDetector.getMaxRotation();
   confidenceScorer.addStage3Score(maxRotation, 0.0f);
 
-  // Stage 4: Inactivity — use configured threshold duration
-  confidenceScorer.addStage4Score((float)INACTIVITY_THRESHOLD_MS, true);
+  // Stage 4: Inactivity — use actual measured inactivity duration
+  confidenceScorer.addStage4Score(fallDetector.getInactivityDuration(), true);
 
   // Add physiological validation from MAX30102 if available
   // TODO: Implement addPhysiologicalScore in ConfidenceScorer
@@ -554,8 +567,12 @@ void handleFallDetected()
   emergencyData.sos_triggered = false;
   strncpy(emergencyData.device_id, deviceID, sizeof(emergencyData.device_id));
 
-  // Copy sensor history (simplified - in full implementation, use detector's history)
-  memcpy(emergencyData.sensor_history, &currentSensorData, sizeof(SensorData_t));
+  // Copy sensor history from fall detector ring buffer
+  uint8_t histCount = fallDetector.getHistoryCount();
+  if (histCount > 0) {
+    memcpy(emergencyData.sensor_history, fallDetector.getSensorHistory(),
+           histCount * sizeof(SensorData_t));
+  }
 
   // Activate alerts based on confidence
   if (confidence >= HIGH_CONFIDENCE_THRESHOLD)

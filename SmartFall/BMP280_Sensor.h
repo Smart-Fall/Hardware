@@ -4,6 +4,7 @@
 #include <Arduino.h>
 #include <Wire.h>
 #include <Adafruit_BMP280.h>
+#include "Config.h"
 
 class BMP280_Sensor {
 private:
@@ -15,13 +16,13 @@ private:
     float seaLevelPressure;
 
     // Retry configuration for I2C communication
-    static const uint8_t MAX_RETRIES = 10;
-    static const uint16_t RETRY_DELAY_MS = 10;
+    static const uint8_t MAX_RETRIES = I2C_SENSOR_MAX_RETRIES;
+    static const uint16_t RETRY_DELAY_MS = I2C_SENSOR_RETRY_DELAY_MS;
 
     // Stale data detection
     float last_pressure = -999.0f;
     uint8_t stale_count = 0;
-    static const uint8_t STALE_THRESHOLD = 3;  // 3 consecutive identical reads = stale
+    static const uint8_t STALE_THRESHOLD = BMP280_STALE_THRESHOLD;
 
 public:
     BMP280_Sensor(uint8_t sda = 255, uint8_t scl = 255);

@@ -4,9 +4,10 @@
 WiFi_Manager::WiFi_Manager()
 {
     lastReconnectAttempt = 0;
-    reconnectInterval = 30000; // 30 seconds
+    reconnectInterval = WIFI_RECONNECT_INTERVAL_MS;
     autoReconnect = false;
     initialized = false;
+    reconnectFailCount = 0;
 }
 
 bool WiFi_Manager::isHTTPS(const String &url)
@@ -111,12 +112,37 @@ void WiFi_Manager::checkConnection()
 
     if (!isConnected())
     {
+        // After WIFI_MAX_RECONNECT_ATTEMPTS consecutive failures, back off to long interval
+        unsigned long interval = (reconnectFailCount >= WIFI_MAX_RECONNECT_ATTEMPTS)
+                                     ? WIFI_RECONNECT_LONG_INTERVAL_MS
+                                     : WIFI_RECONNECT_INTERVAL_MS;
+
         unsigned long currentTime = millis();
-        if (currentTime - lastReconnectAttempt >= reconnectInterval)
+        if (currentTime - lastReconnectAttempt >= interval)
         {
             lastReconnectAttempt = currentTime;
-            Serial.println("\n[WiFi] Connection lost. Attempting to reconnect...");
-            reconnect();
+            Serial.printf("\n[WiFi] Connection lost. Reconnect attempt (fail streak: %d)...\n", reconnectFailCount);
+            if (reconnect())
+            {
+                reconnectFailCount = 0;
+            }
+            else
+            {
+                reconnectFailCount++;
+                if (reconnectFailCount >= WIFI_MAX_RECONNECT_ATTEMPTS)
+                {
+                    Serial.printf("[WiFi] %d consecutive failures — backing off to %lu s interval\n",
+                                  reconnectFailCount, WIFI_RECONNECT_LONG_INTERVAL_MS / 1000UL);
+                }
+            }
+        }
+    }
+    else
+    {
+        // Connected — reset failure streak
+        if (reconnectFailCount > 0)
+        {
+            reconnectFailCount = 0;
         }
     }
 }

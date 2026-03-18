@@ -22,7 +22,7 @@
 #define MPU6050_SCL_PIN SCL   // I2C Clock (auto-detected)
 #define BMP280_SDA_PIN SDA    // I2C Data (shared, auto-detected)
 #define BMP280_SCL_PIN SCL    // I2C Clock (shared, auto-detected)
-#define FSR_ANALOG_PIN A2     // Force sensor analog input (GPIO 34, ADC1 - WiFi safe)
+#define FSR_ANALOG_PIN A4     // Force sensor analog input (GPIO 35, ADC1 - WiFi safe)
 #define SOS_BUTTON_PIN A8     // SOS button with pull-up (GPIO 15)
 #define SPEAKER_PIN A12       // Audio alert output (GPIO 13, PWM capable)
 #define HAPTIC_PIN A0         // Haptic motor control (GPIO 26, DAC2)
@@ -45,15 +45,19 @@
 #endif
 
 // WiFi Configuration
-#define WIFI_SSID "Your_WiFi_SSID"
-#define WIFI_PASSWORD "Your_WiFi_Password"
+#define WIFI_SSID "Mohammed network"
+#define WIFI_PASSWORD "87654321"
 #define WIFI_TIMEOUT_MS 10000
-#define WIFI_RECONNECT_INTERVAL_MS 30000
-#define WIFI_MAX_RECONNECT_ATTEMPTS 5
+#define WIFI_RECONNECT_INTERVAL_MS 30000       // Interval between reconnect attempts (ms)
+#define WIFI_MAX_RECONNECT_ATTEMPTS 5          // Failures before switching to long backoff
+#define WIFI_RECONNECT_LONG_INTERVAL_MS 300000 // 5-min backoff after max failures
 
 // Server Configuration
-#define SERVER_URL "http://your-server.com" // Your alert server URL
-#define SERVER_PORT 80
+#define SERVER_BASE_URL        "https://smartfall.vercel.app"
+#define SERVER_URL             SERVER_BASE_URL  // Base URL used by WiFi_Manager (paths appended via sendJSONToEndpoint)
+#define SERVER_HEALTH_URL      SERVER_BASE_URL "/api/health"
+#define SENSOR_STREAM_URL      SERVER_BASE_URL "/api/device/sensor-stream"
+#define SERVER_PORT            443
 
 // BLE Configuration
 #define BLE_DEVICE_NAME "SmartFall"
@@ -81,6 +85,24 @@
 #define AUDIO_PWM_FREQUENCY 5000       // Base PWM frequency (Hz)
 #define AUDIO_PWM_RESOLUTION 8         // PWM resolution (bits)
 #define AUDIO_ENABLE_VOICE_ALERTS true // Enable voice-like alert sequences
+
+// WiFi / HTTP retry configuration
+#define WIFI_CONNECT_MAX_RETRIES    3
+#define WIFI_CONNECT_RETRY_DELAY_MS 1000
+#define WIFI_HTTP_MAX_RETRIES       3
+#define WIFI_HTTP_RETRY_DELAY_MS    500
+#define WIFI_HTTP_CONNECT_TIMEOUT_MS 5000
+
+// Sensor retry / reliability configuration
+#define I2C_SENSOR_MAX_RETRIES    10   // MPU6050, BMP280, MAX30102
+#define I2C_SENSOR_RETRY_DELAY_MS 10
+#define SENSOR_STALE_THRESHOLD     3   // Consecutive identical reads before reset (MPU6050, MAX30102)
+#define BMP280_STALE_THRESHOLD    100   // BMP280 measurement cycle ~38ms; at 10ms reads, 4 identical reads/cycle is normal
+#define FSR_MAX_RETRIES           10
+#define FSR_RETRY_DELAY_MS        5
+#define FSR_IMPACT_THRESHOLD      500  // ADC counts for impact detection
+#define AUDIO_MAX_RETRIES         3
+#define AUDIO_RETRY_DELAY_MS      100
 
 // Confidence scoring constants
 #define MAX_CONFIDENCE_SCORE 100

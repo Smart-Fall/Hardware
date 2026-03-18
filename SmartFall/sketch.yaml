@@ -15,7 +15,7 @@ default_fqbn: esp32:esp32:adafruit_feather_esp32_v2
 # default_port: /dev/ttyUSB0
 # For Windows, use: COM3, COM4, COM5, etc.
 # Uncomment and modify the line below for Windows:
-default_port: COM5
+default_port: COM7
 
 # Set default monitor baud rate
 monitor_speed: 115200

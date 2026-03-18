@@ -12,13 +12,14 @@ bool Audio_Manager::begin()
 {
     for (uint8_t attempt = 0; attempt < MAX_RETRIES; attempt++)
     {
-        // Configure PWM for audio output (ESP32 v2.x channel-based API)
-        ledcSetup(pwmChannel, 5000, 8);    // channel, freq (5kHz), resolution (8-bit)
-        ledcAttachPin(speakerPin, pwmChannel);
-        ledcWrite(pwmChannel, 0);          // Start silent
-        initialized = true;
-        Serial.println("Audio Manager initialized (PAM8302)");
-        return true;
+        // Configure PWM for audio output (ESP32 v3.x pin-based API)
+        if (ledcAttach(speakerPin, 5000, 8)) // pin, freq (5kHz), resolution (8-bit)
+        {
+            ledcWrite(speakerPin, 0); // Start silent
+            initialized = true;
+            Serial.println("Audio Manager initialized (PAM8302)");
+            return true;
+        }
         if (attempt < MAX_RETRIES - 1)
         {
             Serial.printf("[Audio] PWM init retry %d/%d\n", attempt + 1, MAX_RETRIES);
@@ -56,10 +57,10 @@ void Audio_Manager::playToneInternal(uint16_t frequency, uint32_t duration_ms)
     // Calculate duty cycle based on volume (0-255 for 8-bit)
     uint8_t dutyCycle = map(volume, 0, 100, 0, 128); // Max 50% duty cycle for square wave
 
-    ledcWriteTone(pwmChannel, frequency);
-    ledcWrite(pwmChannel, dutyCycle);
+    ledcWriteTone(speakerPin, frequency);
+    ledcWrite(speakerPin, dutyCycle);
     delay(duration_ms);
-    ledcWrite(pwmChannel, 0); // Silence
+    ledcWrite(speakerPin, 0); // Silence
 }
 
 void Audio_Manager::playTone(uint16_t frequency, uint32_t duration_ms)
@@ -301,10 +302,10 @@ void Audio_Manager::playVoiceAlert(VoiceAlert_t alert)
 
 void Audio_Manager::stopPattern()
 {
-    ledcWrite(pwmChannel, 0);
+    ledcWrite(speakerPin, 0);
 }
 
 void Audio_Manager::silence()
 {
-    ledcWrite(pwmChannel, 0);
+    ledcWrite(speakerPin, 0);
 }

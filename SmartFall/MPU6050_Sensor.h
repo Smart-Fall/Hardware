@@ -5,6 +5,7 @@
 #include <Wire.h>
 #include <Adafruit_MPU6050.h>
 #include <Adafruit_Sensor.h>
+#include "Config.h"
 
 class MPU6050_Sensor {
 private:
@@ -22,16 +23,19 @@ private:
     float accel_offset_z;
     bool calibrated;
 
+    // MPU6050 default I2C address (AD0 pin low)
+    static const uint8_t MPU6050_I2C_ADDRESS = 0x68;
+
     // Retry configuration for I2C communication
-    static const uint8_t MAX_RETRIES = 10;
-    static const uint16_t RETRY_DELAY_MS = 10;
+    static const uint8_t MAX_RETRIES = I2C_SENSOR_MAX_RETRIES;
+    static const uint16_t RETRY_DELAY_MS = I2C_SENSOR_RETRY_DELAY_MS;
 
     // Stale data detection
     float last_accel_x = -999.0f;
     float last_accel_y = -999.0f;
     float last_accel_z = -999.0f;
     uint8_t stale_count = 0;
-    static const uint8_t STALE_THRESHOLD = 3;  // 3 consecutive identical reads = stale
+    static const uint8_t STALE_THRESHOLD = SENSOR_STALE_THRESHOLD;
 
 public:
     MPU6050_Sensor(uint8_t sda = 255, uint8_t scl = 255);

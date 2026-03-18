@@ -11,6 +11,8 @@ MPU6050_Sensor::MPU6050_Sensor(uint8_t sda, uint8_t scl)
 }
 
 bool MPU6050_Sensor::begin() {
+    // Wire.begin() is called once globally in initializeSensors().
+    // Re-calling it here would reset the I2C bus and break all other sensors.
     for (uint8_t attempt = 0; attempt < MAX_RETRIES; attempt++) {
         if (mpu.begin()) {
             initialized = true;
@@ -41,62 +43,60 @@ bool MPU6050_Sensor::readData(float &accel_x, float &accel_y, float &accel_z,
                                float &temp) {
     if (!initialized) return false;
 
-    for (uint8_t attempt = 0; attempt < MAX_RETRIES; attempt++) {
-        try {
-            sensors_event_t a, g, t;
-            mpu.getEvent(&a, &g, &t);
-
-            accel_x = a.acceleration.x / 9.81;  // Convert to g
-            accel_y = a.acceleration.y / 9.81;
-            accel_z = a.acceleration.z / 9.81;
-
-            // Adafruit library returns rad/s; convert to °/s to match thresholds
-            gyro_x = g.gyro.x * (180.0f / M_PI);
-            gyro_y = g.gyro.y * (180.0f / M_PI);
-            gyro_z = g.gyro.z * (180.0f / M_PI);
-
-            temp = t.temperature;
-
-            // Check for stale data (same values repeatedly = sensor frozen)
-            if (accel_x == last_accel_x && accel_y == last_accel_y && accel_z == last_accel_z) {
-                stale_count++;
-                if (stale_count >= STALE_THRESHOLD) {
-                    Serial.printf("[MPU6050] Stale data detected after %d identical reads, resetting sensor...\n", STALE_THRESHOLD);
-                    stale_count = 0;
-                    // Reset by reinitializing
-                    begin();
-                    return false;  // Discard this read, retry on next call
-                }
-            } else {
-                stale_count = 0;  // Reset counter if data changed
-                last_accel_x = accel_x;
-                last_accel_y = accel_y;
-                last_accel_z = accel_z;
-            }
-
-            // Apply calibration offsets if calibrated
-            if (calibrated) {
-                accel_x -= accel_offset_x;
-                accel_y -= accel_offset_y;
-                accel_z -= accel_offset_z;
-
-                gyro_x -= gyro_offset_x;
-                gyro_y -= gyro_offset_y;
-                gyro_z -= gyro_offset_z;
-            }
-
-            return true;
-        } catch (...) {
-            if (attempt < MAX_RETRIES - 1) {
-                Serial.printf("[MPU6050] I2C error on attempt %d/%d, retrying...\n", attempt + 1, MAX_RETRIES);
-                delay(RETRY_DELAY_MS);
-            } else {
-                Serial.printf("[MPU6050] I2C error - all %d retry attempts failed\n", MAX_RETRIES);
-                return false;
-            }
-        }
+    // Probe the I2C bus before calling into the Adafruit library.
+    // If the device doesn't ACK (loose wiring), mpu.getEvent() would crash
+    // the ESP32 with a StoreProhibited panic. Returning false here lets the
+    // higher-level recovery in readSensors() handle the reinit safely.
+    Wire.beginTransmission(MPU6050_I2C_ADDRESS);
+    if (Wire.endTransmission() != 0) {
+        initialized = false;
+        stale_count = 0;
+        return false;
     }
-    return false;
+
+    sensors_event_t a, g, t;
+    mpu.getEvent(&a, &g, &t);
+
+    accel_x = a.acceleration.x / 9.81;  // Convert to g
+    accel_y = a.acceleration.y / 9.81;
+    accel_z = a.acceleration.z / 9.81;
+
+    // Adafruit library returns rad/s; convert to °/s to match thresholds
+    gyro_x = g.gyro.x * (180.0f / M_PI);
+    gyro_y = g.gyro.y * (180.0f / M_PI);
+    gyro_z = g.gyro.z * (180.0f / M_PI);
+
+    temp = t.temperature;
+
+    // Check for stale data (same values repeatedly = sensor frozen)
+    if (accel_x == last_accel_x && accel_y == last_accel_y && accel_z == last_accel_z) {
+        stale_count++;
+        if (stale_count >= STALE_THRESHOLD) {
+            Serial.printf("[MPU6050] Stale data detected after %d identical reads\n", STALE_THRESHOLD);
+            stale_count = 0;
+            // Mark uninitialized — outer recovery in readSensors() handles reinit
+            initialized = false;
+            return false;
+        }
+    } else {
+        stale_count = 0;
+        last_accel_x = accel_x;
+        last_accel_y = accel_y;
+        last_accel_z = accel_z;
+    }
+
+    // Apply calibration offsets if calibrated
+    if (calibrated) {
+        accel_x -= accel_offset_x;
+        accel_y -= accel_offset_y;
+        accel_z -= accel_offset_z;
+
+        gyro_x -= gyro_offset_x;
+        gyro_y -= gyro_offset_y;
+        gyro_z -= gyro_offset_z;
+    }
+
+    return true;
 }
 
 void MPU6050_Sensor::calibrate(uint16_t samples) {

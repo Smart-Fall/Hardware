@@ -67,8 +67,10 @@ public:
     SensorData_t* getSensorHistory();
     uint8_t getHistoryCount();
     float getFreefallDuration();
+    float getMinAcceleration();
     float getMaxImpact();
     float getMaxRotation();
+    float getInactivityDuration();
 
     // Debug functions
     void printStatus();

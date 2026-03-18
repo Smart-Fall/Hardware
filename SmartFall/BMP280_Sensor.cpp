@@ -11,6 +11,8 @@ BMP280_Sensor::BMP280_Sensor(uint8_t sda, uint8_t scl)
 
 bool BMP280_Sensor::begin(uint8_t address)
 {
+    // Wire.begin() is called once globally in initializeSensors().
+    // Re-calling it here would reset the I2C bus and break all other sensors.
     // Try primary address with retries
     for (uint8_t attempt = 0; attempt < MAX_RETRIES; attempt++)
     {

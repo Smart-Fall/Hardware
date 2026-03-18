@@ -397,12 +397,21 @@ float FallDetector::getFreefallDuration() {
     return freefall_duration;
 }
 
+float FallDetector::getMinAcceleration() {
+    return min_acceleration_during_fall;
+}
+
 float FallDetector::getMaxImpact() {
     return max_impact_acceleration;
 }
 
 float FallDetector::getMaxRotation() {
     return max_angular_velocity;
+}
+
+float FallDetector::getInactivityDuration() {
+    if (inactivity_start_time == 0) return 0;
+    return (float)(millis() - inactivity_start_time);
 }
 
 const char* FallDetector::getStatusString(FallStatus_t status) {

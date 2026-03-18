@@ -25,7 +25,7 @@ void BLE_Server::ServerCallbacks::onDisconnect(BLEServer* server) {
 
 // Command Callbacks Implementation
 void BLE_Server::CommandCallbacks::onWrite(BLECharacteristic* characteristic) {
-    std::string value = characteristic->getValue();
+    String value = characteristic->getValue();
 
     if (value.length() > 0) {
         uint8_t command = (uint8_t)value[0];
