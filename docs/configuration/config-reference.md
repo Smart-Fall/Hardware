@@ -111,10 +111,9 @@ Edit this file to customize:
 ### Stage 3: Rotation
 
 ```cpp
-#define ROTATION_THRESHOLD_DPS     150.0f  // Angular velocity threshold (°/s)
-                                           // ⚠️  Config value: 150°/s
-                                           // ⚠️  Spec showed 250°/s (not used)
-                                           // Use Config value as authoritative
+#define ROTATION_THRESHOLD_DPS     250.0f  // Angular velocity threshold (°/s)
+                                           // Typical: 250°/s
+                                           // Detects body rotation during fall
 ```
 
 ### Confidence Thresholds
@@ -154,6 +153,48 @@ Edit this file to customize:
 #define WIFI_POWER_SAVE_ENABLED    false   // Reduce WiFi transmission frequency
 ```
 
+## Sensor Reliability Configuration
+
+### I2C Sensor Retry Parameters
+
+```cpp
+// I2C Communication Retries (MPU6050, BMP280, MAX30102)
+#define I2C_SENSOR_MAX_RETRIES     10      // Retry failed I2C reads 10 times
+#define I2C_SENSOR_RETRY_DELAY_MS  10      // Wait 10ms between I2C retries
+```
+
+### Stale Data Detection
+
+```cpp
+// Stale Reading Thresholds
+#define SENSOR_STALE_THRESHOLD     3       // Reset sensor after 3 consecutive identical reads
+                                           // Applies to: MPU6050, MAX30102
+                                           // Detects sensor hang/communication errors
+
+#define BMP280_STALE_THRESHOLD     100     // BMP280 measurement cycle ~38ms
+                                           // At 10ms read rate, 4 identical reads/cycle is normal
+                                           // Set higher to account for measurement timing
+```
+
+### Force Sensor (FSR) Configuration
+
+```cpp
+// FSR Retry and Sensitivity
+#define FSR_MAX_RETRIES            10      // Retry failed FSR reads 10 times
+#define FSR_RETRY_DELAY_MS         5       // Wait 5ms between FSR retries
+#define FSR_IMPACT_THRESHOLD       500     // ADC counts for impact detection
+                                           // Higher = require stronger pressure
+                                           // Typical: 500 counts on 12-bit ADC
+```
+
+### Audio System Reliability
+
+```cpp
+// Audio Output Retries
+#define AUDIO_MAX_RETRIES          3       // Retry failed audio alert transmissions
+#define AUDIO_RETRY_DELAY_MS       100     // Wait 100ms between retry attempts
+```
+
 ## WiFi Configuration
 
 ```cpp
@@ -162,18 +203,37 @@ Edit this file to customize:
 #define WIFI_PASSWORD              "87654321"             // Your network password
 
 // Connection Timing
-#define WIFI_TIMEOUT_MS            30000   // 30-second connection timeout
+#define WIFI_TIMEOUT_MS            10000   // 10-second connection timeout
 #define WIFI_RECONNECT_INTERVAL_MS 30000   // Try reconnect every 30 seconds
-#define WIFI_MAX_RECONNECT_ATTEMPTS 5      // Maximum reconnection attempts
+#define WIFI_MAX_RECONNECT_ATTEMPTS 5      // Switch to long interval after this many failures
+#define WIFI_RECONNECT_LONG_INTERVAL_MS 300000 // 5-minute backoff after max reconnection attempts
+
+// WiFi Connection Retry Configuration
+#define WIFI_CONNECT_MAX_RETRIES    3      // Retry connection attempts 3 times
+#define WIFI_CONNECT_RETRY_DELAY_MS 1000   // Wait 1 second between retries
+
+// WiFi HTTP Request Retry Configuration
+#define WIFI_HTTP_MAX_RETRIES       3      // Retry failed HTTP requests 3 times
+#define WIFI_HTTP_RETRY_DELAY_MS    500    // Wait 500ms between HTTP retries
+#define WIFI_HTTP_CONNECT_TIMEOUT_MS 5000  // 5-second HTTP connection timeout
 
 // Server Configuration
-#define SERVER_URL                 "http://10.129.112.75:3000"  // Alert server address
-#define SERVER_PORT                3000    // Server port
+#define SERVER_BASE_URL            "https://smartfall.vercel.app"  // Production server
+#define SERVER_URL                 SERVER_BASE_URL                 // Base URL (paths appended)
+#define SERVER_PORT                443     // HTTPS port
 
 // Alert Transmission
 #define EMERGENCY_MAX_RETRIES      3       // Retry failed transmissions 3 times
 #define EMERGENCY_RETRY_INTERVAL_MS 5000   // Wait 5 seconds between retries
 ```
+
+### Two-Tier Reconnection Strategy
+
+After **5 failed reconnection attempts** (default `WIFI_MAX_RECONNECT_ATTEMPTS`):
+- **Normal interval**: 30 seconds (retry frequently while active)
+- **Long interval**: 5 minutes (preserve battery during extended outage)
+
+This reduces power consumption when WiFi is unavailable while maintaining responsiveness when connectivity might be restored.
 
 ### Updating WiFi Credentials
 
@@ -232,6 +292,31 @@ Edit this file to customize:
                                              // false = save CPU/memory
                                              // true = more user-friendly
 ```
+
+## Remote Logging Configuration
+
+```cpp
+// Log Manager Parameters
+#define LOG_BATCH_INTERVAL_MS      30000  // Send log batch every 30 seconds
+                                          // Longer = fewer network requests, more buffering
+                                          // Shorter = more frequent updates, higher overhead
+
+#define LOG_BUFFER_SIZE            30     // Ring buffer capacity (entries)
+                                          // Logs are discarded when buffer fills
+                                          // Each entry ~128 bytes
+
+#define ENABLE_REMOTE_LOGGING      true   // Enable/disable remote log uploads
+                                          // false = logs to Serial only
+                                          // true = logs batched to /api/device/logs
+```
+
+### Log Levels and Categories
+
+**Log Levels**: DEBUG, INFO, WARN, ERROR
+
+**Log Categories**: SYSTEM, FALL_DETECTION, SENSOR, WIFI, EMERGENCY
+
+Logs include optional numeric context (value, threshold) for algorithmic values.
 
 ## Buffer and Memory Configuration
 

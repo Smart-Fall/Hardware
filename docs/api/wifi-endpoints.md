@@ -5,13 +5,13 @@ Complete specification of HTTP endpoints for SmartFall emergency alerts and stat
 ## Base URL Configuration
 
 ```cpp
-// In Config.h
-#define SERVER_URL    "http://10.129.112.75:3000"
-#define SERVER_PORT   3000
+// In Config.h (Production)
+#define SERVER_BASE_URL    "https://smartfall.vercel.app"
+#define SERVER_URL         SERVER_BASE_URL
+#define SERVER_PORT        443
 ```
 
-Set `SERVER_URL` to your backend server address. Both `http://` and `https://` schemes are
-supported — the firmware auto-selects a plain or TLS-secured connection based on the URL prefix.
+Both `http://` and `https://` schemes are supported — the firmware auto-selects a plain or TLS-secured connection based on the URL prefix.
 
 ## Endpoints Overview
 
@@ -20,6 +20,7 @@ supported — the firmware auto-selects a plain or TLS-secured connection based 
 | `/api/falls` | POST | Emergency fall alert | On fall detection |
 | `/api/device/status` | POST | Periodic status update | Every 60 seconds |
 | `/api/device/sensor-stream` | POST | Real-time sensor data | Every 5 seconds |
+| `/api/device/logs` | POST | Batch remote logging | Every 30 seconds |
 
 ## POST /api/falls
 
@@ -41,10 +42,19 @@ Connection: close
 ```json
 {
   "device_id": "SF-AABBCCDDEEFF",
+  "timestamp": 1708809600000,
   "confidence_score": 85,
   "confidence_level": "HIGH",
   "sos_triggered": false,
-  "battery_level": 75.0
+  "battery_level": 75.0,
+  "sensor_data": {
+    "accel_x": -0.42,
+    "accel_y": 0.15,
+    "accel_z": 4.82,
+    "gyro_x": 125.3,
+    "gyro_y": -98.7,
+    "gyro_z": 45.2
+  }
 }
 ```
 
@@ -53,10 +63,12 @@ Connection: close
 | Field | Type | Description |
 |-------|------|-------------|
 | `device_id` | string | Device identifier in `SF-XXXXXXXXXXXX` format |
+| `timestamp` | uint32 | Timestamp when event was recorded (ms) |
 | `confidence_score` | uint8 | 0–100 score from algorithm |
-| `confidence_level` | string | One of: `NO_FALL`, `SUSPICIOUS`, `POTENTIAL`, `HIGH`, `CONFIRMED` |
+| `confidence_level` | string | One of: `NO_FALL`, `SUSPICIOUS`, `POTENTIAL`, `CONFIRMED`, `HIGH` |
 | `sos_triggered` | boolean | `true` if user manually pressed the SOS button |
 | `battery_level` | float | Battery percentage (0–100) |
+| `sensor_data` | object | Snapshot of acceleration, rotation, and pressure at detection time |
 
 > **Note:** No timestamp is sent from the hardware. The server records `new Date()` at
 > receipt time, avoiding the inaccurate `millis()`-since-boot value the device would otherwise send.
@@ -152,6 +164,7 @@ historical graphs and update device `lastSeen`. Unknown devices are auto-registe
   "gyro_y":  -0.50,
   "gyro_z":   0.80,
   "pressure": 101325.00,
+  "fsr": 350,
   "heart_rate": 72,
   "spo2": 98
 }
@@ -164,13 +177,81 @@ historical graphs and update device `lastSeen`. Unknown devices are auto-registe
 | `device_id` | string | — | Device identifier |
 | `accel_x/y/z` | float | g | Acceleration (gravity-normalised) |
 | `gyro_x/y/z` | float | °/s | Angular velocity |
-| `pressure` | float | hPa | Barometric pressure |
+| `pressure` | float | Pa | Barometric pressure |
+| `fsr` | uint16 | ADC counts | Force sensor reading (0-4095 on 12-bit ADC) |
 | `heart_rate` | uint16 | BPM | Heart rate (0 if sensor unavailable) |
-| `spo2` | uint8 | % | Blood oxygen (0 if sensor unavailable) |
+| `spo2` | uint8 | % | Blood oxygen saturation (0 if sensor unavailable) |
 
 > **Auto-registration:** If the backend does not recognise `device_id`, it creates a new
 > device record automatically. Link the device to a patient via the signup form using the
 > MAC address (the system normalises it to the `SF-XXXXXXXXXXXX` format automatically).
+
+---
+
+## POST /api/device/logs
+
+Batch remote logging for debugging and monitoring device behavior. Logs are buffered
+on the device and uploaded every 30 seconds (or immediately on fall detection).
+
+### Request
+
+```json
+{
+  "device_id": "SF-AABBCCDDEEFF",
+  "logs": [
+    {
+      "level": "INFO",
+      "category": "FALL_DETECTION",
+      "message": "Confidence score borderline",
+      "value": 68.0,
+      "threshold": 67.0
+    },
+    {
+      "level": "WARN",
+      "category": "SENSOR",
+      "message": "MPU6050 stale data detected, resetting",
+      "value": 3.0,
+      "threshold": 3.0
+    },
+    {
+      "level": "ERROR",
+      "category": "WIFI",
+      "message": "Connection failed, switching to long backoff interval",
+      "value": 0.0,
+      "threshold": 0.0
+    }
+  ]
+}
+```
+
+### Field Descriptions
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `device_id` | string | Device identifier |
+| `logs` | array | Array of log entries |
+| `level` | string | Log level: `DEBUG`, `INFO`, `WARN`, `ERROR` |
+| `category` | string | Log category: `SYSTEM`, `FALL_DETECTION`, `SENSOR`, `WIFI`, `EMERGENCY` |
+| `message` | string | Log message text |
+| `value` | float | Optional numeric context (0 = unused) |
+| `threshold` | float | Optional threshold for comparison (0 = unused) |
+
+### Response
+
+**Success (200 OK):**
+```json
+{
+  "success": true
+}
+```
+
+### Configuration
+
+```cpp
+#define LOG_BATCH_INTERVAL_MS  30000  // Send batch every 30 seconds
+#define LOG_BUFFER_SIZE        30     // Ring buffer capacity
+#define ENABLE_REMOTE_LOGGING  true   // Enable/disable uploads
+```
 
 ---
 

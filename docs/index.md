@@ -107,13 +107,13 @@ graph TD
 
 ## <svg class="heroicon" viewBox="0 0 24 24" fill="currentColor"><path d="M4 6h16v2H4zm0 5h16v2H4zm0 5h16v2H4z"/></svg> Documentation Structure
 
-- **[Getting Started](getting-started/)** - Setup and upload guides
-- **[Hardware](hardware/)** - Components and wiring diagrams
-- **[Firmware](firmware/)** - Code architecture and module APIs
-- **[Algorithm](algorithm/)** - Detailed detection logic
-- **[Configuration](configuration/)** - All settings reference
-- **[API Reference](api/)** - WiFi and BLE specifications
-- **[Testing](testing/)** - Component and system tests
+- **[Getting Started](getting-started/quick-start.md)** - Setup and upload guides
+- **[Hardware](hardware/overview.md)** - Components and wiring diagrams
+- **[Firmware](firmware/architecture.md)** - Code architecture and module APIs
+- **[Algorithm](algorithm/overview.md)** - Detailed detection logic
+- **[Configuration](configuration/config-reference.md)** - All settings reference
+- **[API Reference](api/wifi-endpoints.md)** - WiFi and BLE specifications
+- **[Testing](testing/component-tests.md)** - Component and system tests
 - **[Troubleshooting](troubleshooting.md)** - Common issues
 
 ## <svg class="heroicon" viewBox="0 0 24 24" fill="currentColor"><path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3z"/></svg> Support

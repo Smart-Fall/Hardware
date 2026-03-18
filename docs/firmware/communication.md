@@ -48,17 +48,40 @@ if (success) {
 ```cpp
 #define WIFI_SSID                 "YourNetworkName"
 #define WIFI_PASSWORD             "YourPassword"
-#define WIFI_TIMEOUT_MS           30000     // 30 second connection timeout
-#define WIFI_RECONNECT_INTERVAL_MS 30000    // Try reconnect every 30s
-#define WIFI_MAX_RECONNECT_ATTEMPTS 5
+#define WIFI_TIMEOUT_MS           10000      // 10 second connection timeout
+#define WIFI_RECONNECT_INTERVAL_MS 30000     // Try reconnect every 30s
+#define WIFI_MAX_RECONNECT_ATTEMPTS 5        // After 5 failures, switch to long backoff
+#define WIFI_RECONNECT_LONG_INTERVAL_MS 300000 // 5-minute backoff interval
 
-// Both http:// and https:// are supported — firmware auto-selects client
-#define SERVER_URL                "http://your-server.com"
-#define SERVER_PORT               80
+// HTTP Connection & Retry Configuration
+#define WIFI_CONNECT_MAX_RETRIES    3        // Retry connection attempts 3 times
+#define WIFI_CONNECT_RETRY_DELAY_MS 1000     // Wait 1s between retries
+#define WIFI_HTTP_MAX_RETRIES       3        // Retry HTTP requests 3 times
+#define WIFI_HTTP_RETRY_DELAY_MS    500      // Wait 500ms between HTTP retries
+#define WIFI_HTTP_CONNECT_TIMEOUT_MS 5000    // 5-second HTTP connect timeout
+
+// Production server (both http:// and https:// supported)
+#define SERVER_BASE_URL           "https://smartfall.vercel.app"
+#define SERVER_URL                SERVER_BASE_URL
+#define SERVER_PORT               443
 
 #define EMERGENCY_MAX_RETRIES     3
 #define EMERGENCY_RETRY_INTERVAL_MS 5000
 ```
+
+#### WiFi Reconnection Strategy
+
+SmartFall implements a **two-tier reconnection backoff** to balance responsiveness with battery life:
+
+1. **Normal phase** (first 5 failures): Retry every **30 seconds**
+   - Device actively trying to reconnect
+   - Suitable when WiFi may be intermittently available
+
+2. **Long backoff phase** (after 5 failures): Retry every **5 minutes**
+   - Reduces power consumption during extended outages
+   - Suitable when WiFi is unavailable for prolonged periods
+
+This strategy automatically engages after `WIFI_MAX_RECONNECT_ATTEMPTS` failures, then resets to normal mode when WiFi is restored.
 
 #### Emergency Alert Transmission
 
@@ -112,21 +135,32 @@ Fall alert payload:
 
 ```
 POST /api/falls HTTP/1.1
-Host: your-server.com
+Host: smartfall.vercel.app
 Content-Type: application/json
 ```
 
 ```json
 {
   "device_id":        "SF-AABBCCDDEEFF",
+  "timestamp":        1708809600000,
   "confidence_score": 85,
   "confidence_level": "HIGH",
   "sos_triggered":    false,
-  "battery_level":    78.5
+  "battery_level":    78.5,
+  "sensor_data": {
+    "accel_x":  -0.42,
+    "accel_y":   0.15,
+    "accel_z":   4.82,
+    "gyro_x":    125.3,
+    "gyro_y":    -98.7,
+    "gyro_z":    45.2
+  }
 }
 ```
 
-`confidence_level` is a string: `NO_FALL`, `SUSPICIOUS`, `POTENTIAL`, `HIGH`, or `CONFIRMED`.
+**Fields:**
+- `confidence_level`: String (`NO_FALL`, `SUSPICIOUS`, `POTENTIAL`, `CONFIRMED`, `HIGH`)
+- `sensor_data`: Snapshot of sensor readings at moment of detection
 
 **Response:**
 ```json
@@ -160,10 +194,18 @@ Sensor readings sent every 5 seconds:
   "gyro_y":     -0.50,
   "gyro_z":      0.80,
   "pressure":    101325.00,
+  "fsr":         350,
   "heart_rate":  72,
   "spo2":        98
 }
 ```
+
+**Fields:**
+- `accel_*`, `gyro_*`: IMU readings (g, °/s)
+- `pressure`: Barometric pressure (Pa)
+- `fsr`: Force sensor reading (ADC counts)
+- `heart_rate`: Pulse rate (BPM, from MAX30102)
+- `spo2`: Blood oxygen saturation (%, from MAX30102)
 
 Unknown devices are auto-registered on first sensor-stream POST.
 
@@ -302,6 +344,98 @@ ble_server.stopAdvertising();
 // Get device name
 String name = ble_server.getDeviceName();
 ```
+
+## Log Manager
+
+Remote logging system for debugging and monitoring device behavior.
+
+### Overview
+
+The `Log_Manager` class maintains a ring buffer of system events and periodically uploads them to the server. Useful for:
+- Diagnosing sensor failures
+- Tracking fall detection pipeline performance
+- Monitoring WiFi connectivity issues
+- Analyzing algorithm behavior in the field
+
+### Initialization
+
+```cpp
+#include "Log_Manager.h"
+
+extern Log_Manager logManager;  // Global singleton
+
+// In setup()
+logManager.begin(&wifi_manager, device_id);
+```
+
+### API
+
+```cpp
+// Log a message with optional numeric context
+void log(LogLevel_t level, LogCategory_t category, const char* message,
+         float value = 0.0f, float threshold = 0.0f);
+
+// Send buffered logs if interval has elapsed
+void flush();
+
+// Force immediate send (called on fall detection)
+void flushImmediate();
+
+// Check initialization status
+bool isReady();
+```
+
+### Log Levels and Categories
+
+**Levels:** `LOG_LEVEL_DEBUG`, `LOG_LEVEL_INFO`, `LOG_LEVEL_WARN`, `LOG_LEVEL_ERROR`
+
+**Categories:** `LOG_CAT_SYSTEM`, `LOG_CAT_FALL_DETECTION`, `LOG_CAT_SENSOR`, `LOG_CAT_WIFI`, `LOG_CAT_EMERGENCY`
+
+### Usage Examples
+
+```cpp
+// Log sensor errors
+logManager.log(LOG_LEVEL_WARN, LOG_CAT_SENSOR,
+               "MPU6050 read failed, retrying", 0, 0);
+
+// Log algorithm decisions with values
+logManager.log(LOG_LEVEL_INFO, LOG_CAT_FALL_DETECTION,
+               "Confidence score borderline",
+               68.0,          // actual score
+               67.0);         // threshold
+
+// Emergency logging (triggers immediate upload)
+logManager.log(LOG_LEVEL_ERROR, LOG_CAT_EMERGENCY, "FALL DETECTED");
+logManager.flushImmediate();
+```
+
+### Configuration
+
+```cpp
+#define LOG_BATCH_INTERVAL_MS  30000  // Send every 30 seconds
+#define LOG_BUFFER_SIZE        30     // Ring buffer capacity
+#define ENABLE_REMOTE_LOGGING  true   // Enable/disable uploads
+```
+
+### Ring Buffer Behavior
+
+- Capacity: **30 entries** (adjustable via `LOG_BUFFER_SIZE`)
+- Each entry: ~200 bytes
+- When full: Oldest entry discarded, new entry added
+- Entries auto-printed to Serial for real-time debugging
+
+### Batch Upload
+
+```cpp
+// Called periodically in main loop
+logManager.flush();
+
+// Called immediately on fall detection
+emergencyComms.sendEmergencyAlert(...);
+logManager.flushImmediate();  // Force send buffered logs
+```
+
+Uploads JSON to `/api/device/logs` (see WiFi Endpoints section).
 
 ## Emergency Communications Class
 

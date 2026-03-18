@@ -25,7 +25,8 @@ SmartFall/
 ├── Communication/
 │   ├── WiFi_Manager.h/cpp        # WiFi connectivity & HTTP
 │   ├── BLE_Server.h/cpp          # Bluetooth Low Energy server
-│   └── Emergency_Comms.h/cpp     # Alert transmission logic
+│   ├── Emergency_Comms.h/cpp     # Alert transmission logic
+│   └── Log_Manager.h/cpp         # Remote logging system
 │
 ├── Audio/
 │   └── Audio_Manager.h/cpp       # PAM8302 audio output system
@@ -63,9 +64,11 @@ graph TD
     F --> F1["WiFi_Manager"]
     F --> F2["BLE_Server"]
     F --> F3["Emergency_Comms"]
+    F --> F4["Log_Manager"]
     F1 --> C
     F2 --> C
     F3 --> C
+    F4 --> F1
 
     A --> G["Audio"]
     G --> G1["Audio_Manager"]

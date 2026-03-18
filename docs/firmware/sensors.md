@@ -184,6 +184,27 @@ if (max30102.isHeartRateValid()) {
 - **Update interval**: ~4 seconds between readings
 - **Historical context**: Compares to user baseline (learned over time)
 
+### Stale Data Detection
+
+The firmware monitors for sensor communication errors by detecting stale (unchanging) readings:
+
+```cpp
+// Configuration
+#define SENSOR_STALE_THRESHOLD     3    // Reset after 3 consecutive identical reads
+#define I2C_SENSOR_MAX_RETRIES     10   // Retry failed I2C reads 10 times
+#define I2C_SENSOR_RETRY_DELAY_MS  10   // Wait 10ms between retries
+
+// Detection
+if (consecutive_identical_readings >= SENSOR_STALE_THRESHOLD) {
+    // Sensor appears hung — trigger I2C bus reset
+    max30102.reset();
+}
+```
+
+**Affected sensors**: MPU6050, MAX30102 (high measurement rate sensors)
+
+**Detection threshold**: BMP280 has separate `BMP280_STALE_THRESHOLD` (100) because measurement cycle is ~38ms, so identical readings are normal at 10ms polling intervals.
+
 ## FSR (Force Sensitive Resistor)
 
 **Measures**: Pressure/force on device strap
@@ -255,32 +276,46 @@ All sensors populate the shared `SensorData_t` structure:
 
 ```cpp
 struct SensorData_t {
-    // Timing
-    uint32_t timestamp_ms;
+    // MPU6050 (6-Axis IMU)
+    float accel_x, accel_y, accel_z;       // Acceleration (g)
+    float gyro_x, gyro_y, gyro_z;          // Angular velocity (°/s)
 
-    // MPU6050
-    float accel_x, accel_y, accel_z;
-    float gyro_x, gyro_y, gyro_z;
+    // BMP280 (Pressure)
+    float pressure;                         // Barometric pressure (hPa)
 
-    // BMP280
-    float pressure_pa;
-    float altitude_m;
-    float temperature_c;
+    // FSR (Force Sensor)
+    uint16_t fsr_value;                    // Primary FSR reading (ADC counts)
+    uint16_t fsr_values[4];                // Individual FSR readings [0-3]
 
-    // MAX30102
-    uint16_t heart_rate;
-    uint8_t spo2;
-    float heart_rate_temperature;
+    // MAX30102 (Heart Rate / SpO2)
+    uint16_t heart_rate;                   // Heart rate (BPM, 0 if invalid)
+    uint8_t spo2;                          // Blood oxygen saturation (%, 0 if invalid)
+    float heart_rate_temperature;          // MAX30102 internal temperature (°C)
 
-    // FSR
-    uint16_t fsr_value;
-    float device_pressure;
-
-    // Power
-    float battery_voltage;
-    uint8_t battery_percent;
+    // Status
+    uint32_t timestamp;                    // Timestamp (ms)
+    bool valid;                            // Data validity flag
 };
 ```
+
+### Field Details
+
+**MPU6050 Fields:**
+- Units are gravity (g) for acceleration, degrees/second for gyro
+- Values are calibrated to remove sensor offsets
+
+**BMP280 Field:**
+- Pressure in hectopascals (hPa), typical sea-level ~1013.25 hPa
+
+**MAX30102 Fields:**
+- `heart_rate`: 0 indicates sensor not ready or invalid reading
+- `spo2`: 0 indicates invalid measurement
+- `heart_rate_temperature`: Internal sensor temperature, useful for calibration validation
+
+**FSR Fields:**
+- Primary `fsr_value`: Main force sensor reading
+- `fsr_values[]`: Individual readings from 4 FSR sensors (if used)
+- Raw ADC values (0-4095 on 12-bit ADC)
 
 ## Sensor Calibration
 
