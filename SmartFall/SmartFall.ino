@@ -26,6 +26,12 @@
 #include "Config.h"
 #include "Data_Types.h"
 
+#if ENABLE_BLE_FALLBACK
+#include "BLE_Server.h"
+BLE_Server bleServer;
+bool bleActive = false;
+#endif
+
 // Sensor instances
 MPU6050_Sensor imuSensor;
 BMP280_Sensor pressureSensor;
@@ -61,9 +67,14 @@ char deviceID[32];
 
 void setup()
 {
+  // CPU frequency scaling — 80MHz is sufficient for sensor polling + WiFi
+  setCpuFrequencyMhz(CPU_FREQUENCY_MHZ);
+
   // Initialize serial communication
+#if !PRODUCTION_MODE
   Serial.begin(SERIAL_BAUD_RATE);
   delay(2000); // Wait for serial monitor
+#endif
 
   Serial.println("\n========================================");
   Serial.println("      SmartFall Detection System");
@@ -107,6 +118,26 @@ void setup()
   // Initialize communication modules
   Serial.println("\n--- Initializing Communication ---");
   initializeCommunication();
+
+  // Power saving: disable MAX30102 collection during normal monitoring
+  // It will be enabled on-demand when a fall is detected
+  if (!MAX30102_ALWAYS_ON && heartRateSensor.isInitialized())
+  {
+    heartRateSensor.stopCollection();
+    Serial.println("[Power] MAX30102 collection stopped (on-demand mode)");
+  }
+
+#if ENABLE_BLE_FALLBACK
+  // BLE fallback: only start if WiFi failed
+  if (!wifiManager.isConnected())
+  {
+    if (bleServer.begin(BLE_DEVICE_NAME))
+    {
+      bleActive = true;
+      Serial.println("[Power] BLE started as WiFi fallback");
+    }
+  }
+#endif
 
   // Initialize remote log manager (after WiFi so it can use the connection)
   logManager.begin(&wifiManager, deviceID);
@@ -170,6 +201,24 @@ void loop()
 
   // Check WiFi connection (auto-reconnect if enabled)
   wifiManager.checkConnection();
+
+#if ENABLE_BLE_FALLBACK
+  // BLE fallback management: start BLE when WiFi drops, stop when WiFi reconnects
+  if (!wifiManager.isConnected() && !bleActive)
+  {
+    if (bleServer.begin(BLE_DEVICE_NAME))
+    {
+      bleActive = true;
+      Serial.println("[Power] BLE activated — WiFi unavailable");
+    }
+  }
+  else if (wifiManager.isConnected() && bleActive && !bleServer.isConnected())
+  {
+    bleServer.end();
+    bleActive = false;
+    Serial.println("[Power] BLE deactivated — WiFi restored");
+  }
+#endif
 
   // Process emergency alert queue (handle retries)
   emergencyComms.processAlertQueue();
@@ -268,11 +317,19 @@ void loop()
       deactivateFullAlert();
       alertActive = false;
       countdownActive = false;
+
+      // Power: deactivate MAX30102 after alert resolves
+      if (!MAX30102_ALWAYS_ON && heartRateSensor.isInitialized())
+      {
+        heartRateSensor.stopCollection();
+        Serial.println("[Power] MAX30102 deactivated — alert resolved");
+      }
     }
   }
 
-  // Send periodic sensor data stream (every 5 seconds)
-  if (currentTime - lastSensorStream >= 5000)
+  // Send periodic sensor data stream (dynamic interval based on alert state)
+  uint32_t streamInterval = alertActive ? SENSOR_STREAM_EMERGENCY_MS : SENSOR_STREAM_INTERVAL_MS;
+  if (currentTime - lastSensorStream >= streamInterval)
   {
     lastSensorStream = currentTime;
     emergencyComms.sendSensorData(currentSensorData, deviceID);
@@ -515,6 +572,13 @@ void handleFallDetected()
   alertActive = true;
 
   Serial.println("\n!!! FALL DETECTED !!!");
+
+  // Power: activate MAX30102 for vitals monitoring during fall event
+  if (!MAX30102_ALWAYS_ON && heartRateSensor.isInitialized())
+  {
+    heartRateSensor.startCollection();
+    Serial.println("[Power] MAX30102 activated for fall event");
+  }
 
   // Update confidence scorer with actual measured values from the fall detector
   confidenceScorer.resetScore();

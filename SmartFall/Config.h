@@ -1,8 +1,21 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
+// ============================================================
+// Power Management Configuration
+// ============================================================
+#define PRODUCTION_MODE false              // Set true to disable all Serial output
+#define WIFI_POWER_SAVE_MODE WIFI_PS_MIN_MODEM  // WIFI_PS_MIN_MODEM or WIFI_PS_MAX_MODEM
+#define CPU_FREQUENCY_MHZ 80               // 80MHz sufficient for sensor polling + WiFi (default 240)
+#define ENABLE_BLE_FALLBACK false          // BLE fallback (adds ~1.5KB IRAM; enable if fits)
+#define MAX30102_ALWAYS_ON false           // false = only collect during/after fall events
+
+// Sensor stream interval (non-emergency). Longer = fewer TX spikes = less power
+#define SENSOR_STREAM_INTERVAL_MS 15000    // 15s in normal mode (was 5s)
+#define SENSOR_STREAM_EMERGENCY_MS 5000    // 5s during active alerts
+
 // System configuration constants
-#define SENSOR_SAMPLE_RATE_HZ 100
+#define SENSOR_SAMPLE_RATE_HZ 50
 #define DETECTION_WINDOW_MS 10000
 #define ALERT_TIMEOUT_MS 30000
 #define BATTERY_LOW_THRESHOLD 3.3f
@@ -68,8 +81,8 @@
 #define EMERGENCY_RETRY_INTERVAL_MS 5000
 
 // Timing constants
-#define MAIN_LOOP_DELAY_MS 10      // 100Hz main loop
-#define SENSOR_READ_INTERVAL_MS 10 // 100Hz sensor reading
+#define MAIN_LOOP_DELAY_MS 20      // 50Hz main loop
+#define SENSOR_READ_INTERVAL_MS 20 // 50Hz sensor reading
 #define HEARTBEAT_INTERVAL_MS 1000 // Status LED blink
 #define SERIAL_BAUD_RATE 115200
 
@@ -121,10 +134,16 @@
 #define LOG_BUFFER_SIZE 30          // Max entries in ring buffer
 #define ENABLE_REMOTE_LOGGING true  // Set false to disable sending logs to server
 
-// Debug settings
-#define DEBUG_SENSOR_DATA false
-#define DEBUG_ALGORITHM_STEPS true
-#define DEBUG_COMMUNICATION true
+// Debug settings (all disabled when PRODUCTION_MODE is true)
+#if PRODUCTION_MODE
+  #define DEBUG_SENSOR_DATA false
+  #define DEBUG_ALGORITHM_STEPS false
+  #define DEBUG_COMMUNICATION false
+#else
+  #define DEBUG_SENSOR_DATA false
+  #define DEBUG_ALGORITHM_STEPS true
+  #define DEBUG_COMMUNICATION true
+#endif
 
 // Test output configuration
 #define ENABLE_TEST_SERIAL_OUTPUT false // Set to false for clean console, logs go to files only

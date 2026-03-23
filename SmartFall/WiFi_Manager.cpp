@@ -57,12 +57,16 @@ bool WiFi_Manager::begin(const char *wifi_ssid, const char *wifi_password)
 
         if (WiFi.status() == WL_CONNECTED)
         {
+            // Enable WiFi modem sleep to save ~60-80mA between beacon intervals
+            WiFi.setSleep(WIFI_POWER_SAVE_MODE);
             Serial.println("WiFi connected successfully!");
             Serial.print("IP Address: ");
             Serial.println(WiFi.localIP());
             Serial.print("Signal Strength (RSSI): ");
             Serial.print(WiFi.RSSI());
             Serial.println(" dBm");
+            Serial.print("WiFi power save: ");
+            Serial.println(WIFI_POWER_SAVE_MODE == WIFI_PS_MAX_MODEM ? "MAX_MODEM" : "MIN_MODEM");
             initialized = true;
             if (logManager.isReady()) {
                 logManager.log(LOG_LEVEL_INFO, LOG_CAT_WIFI, "WiFi connected");
