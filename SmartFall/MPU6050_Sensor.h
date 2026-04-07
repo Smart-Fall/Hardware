@@ -7,7 +7,8 @@
 #include <Adafruit_Sensor.h>
 #include "Config.h"
 
-class MPU6050_Sensor {
+class MPU6050_Sensor
+{
 private:
     Adafruit_MPU6050 mpu;
     bool initialized;
@@ -29,13 +30,6 @@ private:
     // Retry configuration for I2C communication
     static const uint8_t MAX_RETRIES = I2C_SENSOR_MAX_RETRIES;
     static const uint16_t RETRY_DELAY_MS = I2C_SENSOR_RETRY_DELAY_MS;
-
-    // Stale data detection
-    float last_accel_x = -999.0f;
-    float last_accel_y = -999.0f;
-    float last_accel_z = -999.0f;
-    uint8_t stale_count = 0;
-    static const uint8_t STALE_THRESHOLD = SENSOR_STALE_THRESHOLD;
 
 public:
     MPU6050_Sensor(uint8_t sda = 255, uint8_t scl = 255);

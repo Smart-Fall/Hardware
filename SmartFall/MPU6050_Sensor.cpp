@@ -15,16 +15,18 @@ bool MPU6050_Sensor::begin()
 {
     // Wire.begin() is called once globally in initializeSensors().
     // Re-calling it here would reset the I2C bus and break all other sensors.
-    for (uint8_t attempt = 0; attempt < MAX_RETRIES; attempt++)
+    static const uint8_t INIT_RETRIES = 3;
+    for (uint8_t attempt = 0; attempt < INIT_RETRIES; attempt++)
     {
+        yield(); // Feed watchdog between I2C transactions
         if (mpu.begin())
         {
             initialized = true;
             return true;
         }
-        if (attempt < MAX_RETRIES - 1)
+        if (attempt < INIT_RETRIES - 1)
         {
-            Serial.printf("[MPU6050] Init retry %d/%d\n", attempt + 1, MAX_RETRIES);
+            Serial.printf("[MPU6050] Init retry %d/%d\n", attempt + 1, INIT_RETRIES);
             delay(RETRY_DELAY_MS);
         }
     }
@@ -60,7 +62,6 @@ bool MPU6050_Sensor::readData(float &accel_x, float &accel_y, float &accel_z,
     if (Wire.endTransmission() != 0)
     {
         initialized = false;
-        stale_count = 0;
         return false;
     }
 
@@ -77,30 +78,6 @@ bool MPU6050_Sensor::readData(float &accel_x, float &accel_y, float &accel_z,
     gyro_z = g.gyro.z * (180.0f / M_PI);
 
     temp = t.temperature;
-
-    // Check for stale data (same values repeatedly = sensor frozen)
-    const float stale_epsilon = 0.002f;
-    if (fabsf(accel_x - last_accel_x) < stale_epsilon &&
-        fabsf(accel_y - last_accel_y) < stale_epsilon &&
-        fabsf(accel_z - last_accel_z) < stale_epsilon)
-    {
-        stale_count++;
-        if (stale_count >= STALE_THRESHOLD)
-        {
-            Serial.printf("[MPU6050] Stale data detected after %d identical reads\n", STALE_THRESHOLD);
-            stale_count = 0;
-            // Mark uninitialized — outer recovery in readSensors() handles reinit
-            initialized = false;
-            return false;
-        }
-    }
-    else
-    {
-        stale_count = 0;
-        last_accel_x = accel_x;
-        last_accel_y = accel_y;
-        last_accel_z = accel_z;
-    }
 
     // Apply calibration offsets if calibrated
     if (calibrated)

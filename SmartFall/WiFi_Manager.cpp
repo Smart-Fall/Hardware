@@ -32,12 +32,19 @@ bool WiFi_Manager::beginHTTP(HTTPClient &http, const String &url)
 {
     if (isHTTPS(url))
     {
-        secureClient.setInsecure(); // Skip cert validation for self-signed/dev server
-        return http.begin(secureClient, url);
+        secureClient.setInsecure();                                   // Skip cert validation for self-signed/dev server
+        secureClient.setTimeout(WIFI_HTTP_CONNECT_TIMEOUT_MS / 1000); // seconds
+        bool ok = http.begin(secureClient, url);
+        http.setConnectTimeout(WIFI_HTTP_CONNECT_TIMEOUT_MS);
+        http.setTimeout(WIFI_HTTP_CONNECT_TIMEOUT_MS);
+        return ok;
     }
     else
     {
-        return http.begin(plainClient, url);
+        bool ok = http.begin(plainClient, url);
+        http.setConnectTimeout(WIFI_HTTP_CONNECT_TIMEOUT_MS);
+        http.setTimeout(WIFI_HTTP_CONNECT_TIMEOUT_MS);
+        return ok;
     }
 }
 
@@ -47,6 +54,7 @@ bool WiFi_Manager::begin(const char *wifi_ssid, const char *wifi_password)
     password = String(wifi_password);
 
     WiFi.mode(WIFI_STA);
+    WiFi.setSleep(WIFI_PS_NONE); // Disable power-save unconditionally to avoid interrupt WDT
 
     // Keep startup responsive: before first successful connection,
     // try a single quick attempt and rely on loop-based auto-reconnect later.
@@ -83,7 +91,18 @@ bool WiFi_Manager::begin(const char *wifi_ssid, const char *wifi_password)
             Serial.print(WiFi.RSSI());
             Serial.println(" dBm");
             Serial.print("WiFi power save: ");
-            Serial.println(WIFI_POWER_SAVE_MODE == WIFI_PS_MAX_MODEM ? "MAX_MODEM" : "MIN_MODEM");
+            if (WIFI_POWER_SAVE_MODE == WIFI_PS_NONE)
+            {
+                Serial.println("NONE");
+            }
+            else if (WIFI_POWER_SAVE_MODE == WIFI_PS_MAX_MODEM)
+            {
+                Serial.println("MAX_MODEM");
+            }
+            else
+            {
+                Serial.println("MIN_MODEM");
+            }
             initialized = true;
             if (logManager.isReady())
             {
@@ -101,6 +120,8 @@ bool WiFi_Manager::begin(const char *wifi_ssid, const char *wifi_password)
     }
 
     Serial.println("[WiFi] Failed to connect - all retries failed");
+    WiFi.disconnect(true); // Stop WiFi driver background activity to prevent interrupt WDT
+    WiFi.mode(WIFI_OFF);   // Fully disable WiFi radio until next reconnect attempt
     initialized = false;
     if (logManager.isReady())
     {
@@ -172,9 +193,20 @@ void WiFi_Manager::checkConnection()
 
 bool WiFi_Manager::reconnect()
 {
-    WiFi.disconnect();
+    WiFi.disconnect(true);
+    WiFi.mode(WIFI_OFF);
     delay(100);
     return begin(ssid.c_str(), password.c_str());
+}
+
+void WiFi_Manager::shutdown()
+{
+    autoReconnect = false;
+    initialized = false;
+    reconnectFailCount = 0;
+    WiFi.disconnect(true);
+    WiFi.mode(WIFI_OFF);
+    Serial.println("[WiFi] Driver shut down for debug isolation");
 }
 
 bool WiFi_Manager::sendTestMessage(const String &message)
@@ -220,6 +252,7 @@ bool WiFi_Manager::sendTestMessage(const String &message)
 
         if (attempt < HTTP_MAX_RETRIES - 1)
         {
+            yield();
             delay(HTTP_RETRY_DELAY_MS);
         }
     }
@@ -271,6 +304,7 @@ bool WiFi_Manager::sendJSON(const String &jsonPayload)
 
         if (attempt < HTTP_MAX_RETRIES - 1)
         {
+            yield();
             delay(HTTP_RETRY_DELAY_MS);
         }
     }
@@ -354,6 +388,7 @@ bool WiFi_Manager::sendJSONToEndpoint(const String &path, const String &jsonPayl
 
         if (attempt < HTTP_MAX_RETRIES - 1)
         {
+            yield();
             delay(HTTP_RETRY_DELAY_MS);
         }
     }
@@ -386,7 +421,10 @@ String WiFi_Manager::getFromEndpoint(const String &path)
 
         http.end();
         if (attempt < HTTP_MAX_RETRIES - 1)
+        {
+            yield();
             delay(HTTP_RETRY_DELAY_MS);
+        }
     }
 
     return "";

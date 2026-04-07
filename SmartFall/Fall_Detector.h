@@ -28,6 +28,8 @@ private:
     bool stage4_triggered;
     uint32_t stage1_exit_candidate_start;
     uint32_t stage2_last_above_threshold_time;
+    uint32_t stage4_exit_candidate_start;
+    uint32_t potential_exit_candidate_start;
 
     // Sensor data history for analysis
     SensorData_t sensor_history[SENSOR_HISTORY_SIZE];
@@ -92,6 +94,7 @@ private:
     bool checkStage2_Impact(SensorData_t &data);
     bool checkStage3_Rotation(SensorData_t &data);
     bool checkStage4_Inactivity(SensorData_t &data);
+    bool checkPotentialFallPersistence(SensorData_t &data);
 
     // Analysis helper functions
     float calculateTotalAcceleration(SensorData_t &data);

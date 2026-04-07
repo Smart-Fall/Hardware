@@ -4,11 +4,11 @@
 // ============================================================
 // Power Management Configuration
 // ============================================================
-#define PRODUCTION_MODE false                  // Set true to disable all Serial output
-#define WIFI_POWER_SAVE_MODE WIFI_PS_MIN_MODEM // WIFI_PS_MIN_MODEM or WIFI_PS_MAX_MODEM
-#define CPU_FREQUENCY_MHZ 80                   // 80MHz sufficient for sensor polling + WiFi (default 240)
-#define ENABLE_BLE_FALLBACK false              // BLE fallback (adds ~1.5KB IRAM; enable if fits)
-#define MAX30102_ALWAYS_ON false               // Heart-rate sensor is not used in fall logic
+#define PRODUCTION_MODE false             // Set true to disable all Serial output
+#define WIFI_POWER_SAVE_MODE WIFI_PS_NONE // WIFI_PS_NONE avoids TG1WDT reset from modem wake-up
+#define CPU_FREQUENCY_MHZ 160             // 160MHz: TLS handshakes need >80MHz to avoid WDT (still saves power vs 240)
+#define ENABLE_BLE_FALLBACK false         // BLE fallback (adds ~1.5KB IRAM; enable if fits)
+#define MAX30102_ALWAYS_ON false          // Heart-rate sensor is not used in fall logic
 
 // Sensor stream interval (non-emergency). Longer = fewer TX spikes = less power
 #define SENSOR_STREAM_INTERVAL_MS 15000 // 15s in normal mode (was 5s)
@@ -30,8 +30,12 @@
 #define STAGE1_EXIT_DEBOUNCE_MS 40
 #define IMPACT_MAX_DELAY_MS 1500
 #define STAGE2_HOLD_MS 120
+#define STAGE4_EXIT_DEBOUNCE_MS 500
+#define POTENTIAL_FALL_EXIT_DEBOUNCE_MS 800
 #define INACTIVITY_RECOVERY_ACCEL_G 1.5f
 #define INACTIVITY_RECOVERY_ANGULAR_DPS 100.0f
+#define POTENTIAL_RECOVERY_ACCEL_G 1.6f
+#define POTENTIAL_RECOVERY_ANGULAR_DPS 115.0f
 
 // Pin Definitions (ESP32 Feather V2 / ESP32 HUZZAH32 Feather)
 // I2C Bus - Auto-detected based on board type:
@@ -94,9 +98,10 @@
 #define EMERGENCY_RETRY_INTERVAL_MS 5000
 
 // Timing constants
-#define MAIN_LOOP_DELAY_MS 20      // 50Hz main loop
-#define SENSOR_READ_INTERVAL_MS 20 // 50Hz sensor reading
-#define HEARTBEAT_INTERVAL_MS 1000 // Status LED blink
+#define MAIN_LOOP_DELAY_MS 20       // 50Hz main loop
+#define SENSOR_READ_INTERVAL_MS 20  // 50Hz sensor reading
+#define BMP280_READ_INTERVAL_MS 100 // 10Hz barometer polling; BMP280 data changes much slower than IMU data
+#define HEARTBEAT_INTERVAL_MS 1000  // Status LED blink
 #define SERIAL_BAUD_RATE 115200
 
 // Alert system constants
@@ -117,7 +122,7 @@
 // WiFi / HTTP retry configuration
 #define WIFI_CONNECT_MAX_RETRIES 3
 #define WIFI_CONNECT_RETRY_DELAY_MS 1000
-#define WIFI_HTTP_MAX_RETRIES 3
+#define WIFI_HTTP_MAX_RETRIES 1
 #define WIFI_HTTP_RETRY_DELAY_MS 500
 #define WIFI_HTTP_CONNECT_TIMEOUT_MS 5000
 
@@ -147,17 +152,25 @@
 // Remote logging configuration
 #define LOG_BATCH_INTERVAL_MS 30000 // Send log batch every 30 seconds
 #define LOG_BUFFER_SIZE 30          // Max entries in ring buffer
-#define ENABLE_REMOTE_LOGGING true  // Set false to disable sending logs to server
+#define ENABLE_REMOTE_LOGGING false // Set true to enable sending logs to server
 
 // Debug settings (all disabled when PRODUCTION_MODE is true)
 #if PRODUCTION_MODE
 #define DEBUG_SENSOR_DATA false
 #define DEBUG_ALGORITHM_STEPS false
 #define DEBUG_COMMUNICATION false
+#define DEBUG_WDT_TRACE false
+#define DEBUG_RUNTIME_LOOP_LOGS false
+#define DEBUG_DISABLE_WIFI_AFTER_SETUP false
+#define DEBUG_SKIP_LOOP_SENSOR_IO false
 #else
 #define DEBUG_SENSOR_DATA false
-#define DEBUG_ALGORITHM_STEPS true
+#define DEBUG_ALGORITHM_STEPS false
 #define DEBUG_COMMUNICATION true
+#define DEBUG_WDT_TRACE false
+#define DEBUG_RUNTIME_LOOP_LOGS false
+#define DEBUG_DISABLE_WIFI_AFTER_SETUP true
+#define DEBUG_SKIP_LOOP_SENSOR_IO true
 #endif
 
 // Test output configuration

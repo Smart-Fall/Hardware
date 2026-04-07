@@ -6,10 +6,12 @@
 #include <Adafruit_BMP280.h>
 #include "Config.h"
 
-class BMP280_Sensor {
+class BMP280_Sensor
+{
 private:
-    Adafruit_BMP280 bmp;
+    Adafruit_BMP280 bmp{&Wire};
     bool initialized;
+    uint8_t i2c_address;
     uint8_t sda_pin;
     uint8_t scl_pin;
     float baselineAltitude;
@@ -18,11 +20,6 @@ private:
     // Retry configuration for I2C communication
     static const uint8_t MAX_RETRIES = I2C_SENSOR_MAX_RETRIES;
     static const uint16_t RETRY_DELAY_MS = I2C_SENSOR_RETRY_DELAY_MS;
-
-    // Stale data detection
-    float last_pressure = -999.0f;
-    uint8_t stale_count = 0;
-    static const uint8_t STALE_THRESHOLD = BMP280_STALE_THRESHOLD;
 
 public:
     BMP280_Sensor(uint8_t sda = 255, uint8_t scl = 255);

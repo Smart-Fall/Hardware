@@ -39,6 +39,7 @@ public:
     bool isConnected();
     void checkConnection();
     bool reconnect();
+    void shutdown();
 
     // HTTP communication
     bool sendTestMessage(const String &message);

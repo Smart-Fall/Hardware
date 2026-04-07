@@ -1,0 +1,1073 @@
+/*
+ * SmartFall - Complete Wearable Fall Detection System
+ * with WiFi Communication + Audio Alerts
+ *
+ * Hardware: ESP32 Feather V2
+ * Sensors: MPU6050Sensor (IMU), BMP280Sensor (Pressure), FSR (Force)
+ * Communication: WiFi
+ * Audio: PAM8302 2.5W Class D Amplifier
+ *
+ * This is the complete implementation with all features integrated.
+ */
+
+#include <esp_mac.h> // For MAC address functions in ESP32 core 3.x
+
+#include <Wire.h>
+#include "Board_Config.h"
+#include "MPU6050_Sensor.h"
+#include "BMP280_Sensor.h"
+#include "FSR_Sensor.h"
+#include "Fall_Detector.h"
+#include "Confidence_Scorer.h"
+#include "WiFi_Manager.h"
+#include "Emergency_Comms.h"
+#include "Audio_Manager.h"
+#include "Fall_Store.h"
+#include "Log_Manager.h"
+#include "Config.h"
+#include "Data_Types.h"
+#include "WiFi_Credentials.h"
+
+#if ENABLE_BLE_FALLBACK
+#include "BLE_Server.h"
+BLE_Server bleServer;
+bool bleActive = false;
+#endif
+
+// Sensor instances
+MPU6050_Sensor imuSensor;
+BMP280_Sensor pressureSensor;
+FSR_Sensor fsr4(FSR_ANALOG_PIN);
+
+// Detection system
+FallDetector fallDetector;
+ConfidenceScorer confidenceScorer;
+
+// Communication system
+WiFi_Manager wifiManager;
+Emergency_Comms emergencyComms(&wifiManager, nullptr);
+
+// Audio system
+Audio_Manager audioManager(SPEAKER_PIN);
+
+// Flash-backed fall queue
+Fall_Store fallStore;
+
+// System state
+SensorData_t currentSensorData;
+SystemStatus_t systemStatus;
+uint32_t lastSensorRead = 0;
+uint32_t lastStatusUpdate = 0;
+uint32_t lastSensorStream = 0;
+uint32_t lastCommandPoll = 0;
+uint32_t lastFallStoreRetry = 0;
+bool systemInitialized = false;
+bool alertActive = false;
+bool sosAlertActive = false;
+uint32_t sosAlertEnd = 0;
+bool lastSOSButtonState = false;
+
+// Non-blocking alert countdown state
+uint32_t alertCountdownEnd = 0;
+bool countdownActive = false;
+uint8_t postAccelTracePhase = 0;
+
+// Device ID (MAC address based)
+char deviceID[32];
+
+// WiFi credentials (loaded from NVS at startup)
+char wifiSSID[32];
+char wifiPassword[64];
+
+static void tracePostAccel(const char *marker)
+{
+#if DEBUG_WDT_TRACE && DEBUG_RUNTIME_LOOP_LOGS
+  if (postAccelTracePhase != 0)
+  {
+    Serial.print("[Trace] ");
+    Serial.println(marker);
+  }
+#else
+  (void)marker;
+#endif
+}
+
+void setup()
+{
+  // CPU frequency scaling
+  setCpuFrequencyMhz(CPU_FREQUENCY_MHZ);
+
+  // Initialize serial communication
+#if !PRODUCTION_MODE
+  Serial.begin(SERIAL_BAUD_RATE);
+  delay(300); // Short wait keeps provisioning handshake responsive
+#endif
+
+  Serial.println("\n========================================");
+  Serial.println("      SmartFall Detection System");
+  Serial.println("   Complete with Audio & Communication");
+  Serial.println("========================================\n");
+
+  // Generate device ID from MAC address
+  generateDeviceID();
+
+  // Initialize board detection and configure I2C pins
+  Board_Config::begin();
+
+  // Initialize SOS button
+  pinMode(SOS_BUTTON_PIN, INPUT_PULLUP);
+
+  // Initialize visual alert output
+  pinMode(VISUAL_ALERT_PIN, OUTPUT);
+
+  digitalWrite(VISUAL_ALERT_PIN, LOW);
+
+  // Initialize audio system
+  Serial.println("--- Initializing Audio System ---");
+  if (audioManager.begin())
+  {
+    audioManager.setVolume(AUDIO_DEFAULT_VOLUME);
+    Serial.println("✓ PAM8302 amplifier initialized");
+  }
+  else
+  {
+    Serial.println("ERROR: Failed to initialize audio!");
+  }
+
+  // Initialize flash fall store
+  Serial.println("--- Initializing Fall Store ---");
+  fallStore.begin();
+
+  // Initialize sensors
+  Serial.println("\n--- Initializing Sensors ---");
+  initializeSensors();
+
+  // Initialize communication modules
+  Serial.println("\n--- Initializing Communication ---");
+  initializeCommunication();
+
+#if ENABLE_BLE_FALLBACK
+  // BLE fallback: only start if WiFi failed
+  if (!wifiManager.isConnected())
+  {
+    if (bleServer.begin(BLE_DEVICE_NAME))
+    {
+      bleActive = true;
+      Serial.println("[Power] BLE started as WiFi fallback");
+    }
+  }
+#endif
+
+  // Initialize remote log manager (after WiFi so it can use the connection)
+  logManager.begin(&wifiManager, deviceID);
+  logManager.log(LOG_LEVEL_INFO, LOG_CAT_SYSTEM, "SmartFall system initialized");
+
+  // Initialize fall detector
+  if (fallDetector.init())
+  {
+    Serial.println("✓ Fall detector initialized");
+    fallDetector.enableMonitoring();
+    Serial.println("✓ Fall monitoring ENABLED");
+    Serial.println("\n*** SHAKE/DROP THE DEVICE TO TEST FALL DETECTION ***\n");
+  }
+  else
+  {
+    Serial.println("ERROR: Failed to initialize fall detector!");
+  }
+
+  // Initialize system status
+  updateSystemStatus();
+
+  systemInitialized = true;
+  Serial.println("\n========================================");
+  Serial.println("       SmartFall Ready!");
+  Serial.println("========================================");
+  Serial.println("Monitoring for falls...");
+  Serial.println("\nTest Commands:");
+  Serial.println("  T - Trigger manual fall test");
+  Serial.println("  S - Show current sensor readings");
+  Serial.println("========================================\n");
+
+  // Print connection info
+  printSystemInfo();
+
+#if DEBUG_DISABLE_WIFI_AFTER_SETUP
+  if (wifiManager.isConnected())
+  {
+    wifiManager.shutdown();
+  }
+#endif
+
+  // Stagger HTTP timers so the first sensor-stream, command-poll and
+  // status-update don't all fire on the very first loop iteration.
+  // Without this, setup() taking >15s causes all three HTTPS calls to
+  // stack up simultaneously, which can still trigger the task WDT.
+  lastSensorStream = millis();
+  lastCommandPoll = millis();
+  lastStatusUpdate = millis();
+  lastFallStoreRetry = millis();
+}
+
+void handleSerialLine(const char *line)
+{
+  // Legacy single-char commands (for developers)
+  if (strlen(line) == 1)
+  {
+    char cmd = line[0];
+    if (cmd == 't' || cmd == 'T')
+    {
+      Serial.println("\n*** MANUAL FALL TEST TRIGGERED ***");
+      handleFallDetected();
+      return;
+    }
+    else if (cmd == 's' || cmd == 'S')
+    {
+      Serial.println("\n--- Current Sensor Readings ---");
+      printSensorData();
+      return;
+    }
+  }
+
+  // JSON provisioning commands
+  if (line[0] != '{')
+    return; // not JSON, ignore
+
+  // Handle "identify" or "get_status" commands
+  if (strstr(line, "\"identify\"") || strstr(line, "\"get_status\""))
+  {
+    String ssidNow = WiFi_Credentials::getSavedSSID();
+    char resp[192];
+    snprintf(resp, sizeof(resp),
+             "{\"device_id\":\"%s\",\"ssid\":\"%s\",\"wifi_connected\":%s,\"firmware\":\"1.0\"}",
+             deviceID, ssidNow.c_str(), wifiManager.isConnected() ? "true" : "false");
+    Serial.println(resp);
+    return;
+  }
+
+  // Handle "set_wifi" command
+  if (strstr(line, "\"set_wifi\""))
+  {
+    char newSSID[32] = "";
+    char newPass[64] = "";
+
+    // Parse "ssid":"VALUE"
+    const char *sp = strstr(line, "\"ssid\"");
+    if (sp)
+    {
+      sp = strchr(sp + 6, ':'); // skip past "ssid"
+      if (sp)
+      {
+        sp = strchr(sp, '"'); // opening quote of value
+        if (sp)
+        {
+          sp++;                             // first char of value
+          const char *ep = strchr(sp, '"'); // closing quote
+          if (ep)
+          {
+            size_t len = ep - sp;
+            if (len < sizeof(newSSID))
+              strncpy(newSSID, sp, len);
+          }
+        }
+      }
+    }
+
+    // Parse "password":"VALUE"
+    const char *pp = strstr(line, "\"password\"");
+    if (pp)
+    {
+      pp = strchr(pp + 10, ':');
+      if (pp)
+      {
+        pp = strchr(pp, '"');
+        if (pp)
+        {
+          pp++;
+          const char *ep = strchr(pp, '"');
+          if (ep)
+          {
+            size_t len = ep - pp;
+            if (len < sizeof(newPass))
+              strncpy(newPass, pp, len);
+          }
+        }
+      }
+    }
+
+    if (strlen(newSSID) == 0)
+    {
+      Serial.println("{\"status\":\"error\",\"message\":\"Missing ssid\"}");
+      return;
+    }
+
+    if (WiFi_Credentials::save(newSSID, newPass))
+    {
+      Serial.println("{\"status\":\"ok\",\"message\":\"Credentials saved. Rebooting...\"}");
+      Serial.flush();
+      delay(1000);
+      ESP.restart();
+    }
+    else
+    {
+      Serial.println("{\"status\":\"error\",\"message\":\"NVS write failed\"}");
+    }
+    return;
+  }
+
+  // Unknown JSON action
+  Serial.println("{\"status\":\"error\",\"message\":\"Unknown action\"}");
+}
+
+void loop()
+{
+#if DEBUG_WDT_TRACE && DEBUG_RUNTIME_LOOP_LOGS
+  if (postAccelTracePhase == 1)
+  {
+    tracePostAccel("loop-top");
+    postAccelTracePhase = 2;
+  }
+#endif
+
+  uint32_t currentTime = millis();
+  tracePostAccel("after-millis");
+
+  // Check for serial commands (line-based: JSON provisioning or single-char test commands)
+  if (Serial.available() > 0)
+  {
+    static char serialBuf[256];
+    static uint8_t serialPos = 0;
+    while (Serial.available() > 0)
+    {
+      char c = Serial.read();
+      if (c == '\n' || c == '\r')
+      {
+        if (serialPos > 0)
+        {
+          serialBuf[serialPos] = '\0';
+          handleSerialLine(serialBuf);
+          serialPos = 0;
+        }
+      }
+      else if (serialPos < sizeof(serialBuf) - 1)
+      {
+        serialBuf[serialPos++] = c;
+      }
+    }
+  }
+  tracePostAccel("after-serial");
+
+  // Check WiFi connection (auto-reconnect if enabled)
+  wifiManager.checkConnection();
+  tracePostAccel("after-checkConnection");
+
+#if ENABLE_BLE_FALLBACK
+  // BLE fallback management: start BLE when WiFi drops, stop when WiFi reconnects
+  if (!wifiManager.isConnected() && !bleActive)
+  {
+    if (bleServer.begin(BLE_DEVICE_NAME))
+    {
+      bleActive = true;
+      Serial.println("[Power] BLE activated — WiFi unavailable");
+    }
+  }
+  else if (wifiManager.isConnected() && bleActive && !bleServer.isConnected())
+  {
+    bleServer.end();
+    bleActive = false;
+    Serial.println("[Power] BLE deactivated — WiFi restored");
+  }
+#endif
+
+  // Process emergency alert queue (handle retries)
+  emergencyComms.processAlertQueue();
+
+  // Check SOS button on press edge only.
+  bool sosPressed = (digitalRead(SOS_BUTTON_PIN) == LOW);
+  if (sosPressed && !lastSOSButtonState && !countdownActive)
+  {
+    handleSOSButton();
+  }
+  lastSOSButtonState = sosPressed;
+  tracePostAccel("after-sos-check");
+
+  // Read sensors at configured rate
+  if (currentTime - lastSensorRead >= SENSOR_READ_INTERVAL_MS)
+  {
+    lastSensorRead = currentTime;
+    tracePostAccel("before-readSensors");
+
+#if DEBUG_SKIP_LOOP_SENSOR_IO
+    currentSensorData.timestamp = currentTime;
+    currentSensorData.valid = false;
+    currentSensorData.accel_x = 0.0f;
+    currentSensorData.accel_y = 0.0f;
+    currentSensorData.accel_z = 1.0f;
+    currentSensorData.gyro_x = 0.0f;
+    currentSensorData.gyro_y = 0.0f;
+    currentSensorData.gyro_z = 0.0f;
+    currentSensorData.pressure = 1013.25f;
+    currentSensorData.fsr_values[3] = 0;
+    currentSensorData.fsr_value = 0;
+    FallStatus_t status = fallDetector.getCurrentStatus();
+#else
+    // Read all sensors
+    readSensors();
+    tracePostAccel("after-readSensors");
+
+    // Log sensor status periodically (every 5 seconds)
+    static uint32_t lastSensorLog = 0;
+    if (DEBUG_RUNTIME_LOOP_LOGS && DEBUG_ALGORITHM_STEPS && (currentTime - lastSensorLog) >= 5000)
+    {
+      lastSensorLog = currentTime;
+      Serial.println("\n=== Sensor Status ===");
+      Serial.print("IMU: ");
+      Serial.println(imuSensor.isInitialized() ? "OK" : "ERROR");
+      Serial.print("BMP280: ");
+      Serial.println(pressureSensor.isInitialized() ? "OK" : "ERROR");
+      Serial.print("FSR4: ");
+      Serial.println(fsr4.isInitialized() ? "OK" : "ERROR");
+      Serial.print("Fall Detector: ");
+      Serial.println(fallDetector.isMonitoring() ? "MONITORING" : "INACTIVE");
+      Serial.println("===================\n");
+    }
+
+    // Process sensor data through fall detector
+    fallDetector.processSensorData(currentSensorData);
+    tracePostAccel("after-processSensorData");
+
+    // Check fall status
+    FallStatus_t status = fallDetector.getCurrentStatus();
+    tracePostAccel("after-getCurrentStatus");
+#endif
+
+    // Log current acceleration magnitude and FSR every 2 seconds
+    static uint32_t lastAccelLog = 0;
+    if (DEBUG_RUNTIME_LOOP_LOGS && DEBUG_ALGORITHM_STEPS && (currentTime - lastAccelLog) >= 2000)
+    {
+      lastAccelLog = currentTime;
+      float total_accel = sqrt(currentSensorData.accel_x * currentSensorData.accel_x +
+                               currentSensorData.accel_y * currentSensorData.accel_y +
+                               currentSensorData.accel_z * currentSensorData.accel_z);
+      Serial.print("[AccelMag] ");
+      Serial.print(total_accel, 3);
+      Serial.print("g | [FSR] raw=");
+      Serial.print(currentSensorData.fsr_value);
+      Serial.print(" baseline=");
+      Serial.print(fsr4.getBaseline());
+      Serial.print(" | Status: ");
+      Serial.println(status);
+#if DEBUG_WDT_TRACE && DEBUG_RUNTIME_LOOP_LOGS
+      postAccelTracePhase = 1;
+      tracePostAccel("after-accel");
+#endif
+    }
+
+    if (status == FALL_STATUS_FALL_DETECTED && !alertActive)
+    {
+      handleFallDetected();
+    }
+
+    // Debug output
+    if (DEBUG_SENSOR_DATA && (currentTime % 1000 == 0))
+    {
+      printSensorData();
+    }
+
+    tracePostAccel("after-sensor-block");
+  }
+
+  // Handle alert countdown (non-blocking)
+  if (countdownActive)
+  {
+    static uint32_t lastBeep = 0;
+    uint32_t remaining = (alertCountdownEnd > currentTime) ? (alertCountdownEnd - currentTime) / 1000 : 0;
+
+    // Countdown log feedback
+    if (currentTime - lastBeep >= 10000 || remaining <= 5)
+    {
+      lastBeep = currentTime;
+      Serial.print("Countdown: ");
+      Serial.println(remaining);
+    }
+
+    bool expired = (currentTime >= alertCountdownEnd);
+    bool confirmed = (digitalRead(SOS_BUTTON_PIN) == LOW);
+
+    if (expired || confirmed)
+    {
+      if (confirmed)
+        Serial.println("User confirmed emergency!");
+      fallDetector.resetDetection();
+      deactivateFullAlert();
+      alertActive = false;
+      countdownActive = false;
+    }
+  }
+
+  // End manual SOS alert without blocking loop execution.
+  if (sosAlertActive && currentTime >= sosAlertEnd)
+  {
+    deactivateFullAlert();
+    alertActive = false;
+    sosAlertActive = false;
+  }
+
+  tracePostAccel("before-network-timers");
+
+  // Send periodic sensor data stream (dynamic interval based on alert state)
+  uint32_t streamInterval = alertActive ? SENSOR_STREAM_EMERGENCY_MS : SENSOR_STREAM_INTERVAL_MS;
+  if (currentTime - lastSensorStream >= streamInterval)
+  {
+    lastSensorStream = currentTime;
+    emergencyComms.sendSensorData(currentSensorData, deviceID);
+  }
+
+  // Retry any unsent falls stored in flash (every 30s, only when WiFi is up)
+  if (wifiManager.isConnected() && (currentTime - lastFallStoreRetry >= 30000))
+  {
+    lastFallStoreRetry = currentTime;
+    if (fallStore.hasPending())
+    {
+      EmergencyData_t pending[FALL_STORE_MAX_PENDING];
+      uint8_t count = fallStore.loadPending(pending, FALL_STORE_MAX_PENDING);
+      for (uint8_t i = 0; i < count; i++)
+      {
+        Serial.printf("[FallStore] Retrying stored fall ts=%lu\n", (unsigned long)pending[i].timestamp);
+        bool sent = emergencyComms.sendEmergencyAlert(pending[i]);
+        if (sent)
+          fallStore.remove(pending[i].timestamp);
+      }
+    }
+  }
+
+  // Poll server for commands (mute/unmute) every 10 seconds
+  if (currentTime - lastCommandPoll >= 10000)
+  {
+    lastCommandPoll = currentTime;
+    emergencyComms.pollCommands(&audioManager, deviceID);
+  }
+
+  // Send periodic status updates
+  if (currentTime - lastStatusUpdate >= 60000)
+  { // Every minute
+    lastStatusUpdate = currentTime;
+    updateSystemStatus();
+    emergencyComms.sendStatusUpdate(systemStatus, deviceID);
+
+    // Check battery level (low battery logged only — no audio)
+    if (systemStatus.battery_percentage < 20.0)
+    {
+      Serial.println("[Battery] Low battery warning");
+    }
+  }
+
+  // Flush remote log buffer on schedule
+  tracePostAccel("before-flush");
+  logManager.flush();
+
+  tracePostAccel("before-delay");
+#if DEBUG_WDT_TRACE && DEBUG_RUNTIME_LOOP_LOGS
+  if (postAccelTracePhase == 2)
+  {
+    postAccelTracePhase = 0;
+  }
+#endif
+  delay(MAIN_LOOP_DELAY_MS);
+}
+
+void generateDeviceID()
+{
+  uint8_t mac[6];
+  esp_efuse_mac_get_default(mac);
+  snprintf(deviceID, sizeof(deviceID), "%02X:%02X:%02X:%02X:%02X:%02X",
+           mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+  Serial.print("Device ID: ");
+  Serial.println(deviceID);
+}
+
+void initializeSensors()
+{
+  systemStatus.sensors_initialized = true;
+
+  // Initialize I2C bus once; individual sensors must not call Wire.begin()
+  Wire.begin(Board_Config::getSDA(), Board_Config::getSCL());
+  Wire.setTimeout(50); // Prevent I2C bus hangs from holding interrupts too long
+
+  if (!imuSensor.begin())
+  {
+    Serial.println("ERROR: Failed to initialize MPU6050!");
+    systemStatus.sensors_initialized = false;
+  }
+  else
+  {
+    Serial.println("✓ MPU6050Sensor initialized");
+    imuSensor.configure();
+  }
+
+  if (!pressureSensor.begin())
+  {
+    Serial.println("ERROR: Failed to initialize BMP280!");
+    systemStatus.sensors_initialized = false;
+  }
+  else
+  {
+    Serial.println("✓ BMP280Sensor initialized");
+    pressureSensor.configure();
+    delay(1000);
+    pressureSensor.resetBaselineAltitude();
+  }
+
+  // Initialize FSR4 sensor
+  if (!fsr4.begin())
+  {
+    Serial.println("ERROR: Failed to initialize FSR4!");
+    systemStatus.sensors_initialized = false;
+  }
+  else
+  {
+    Serial.println("✓ FSR4 sensor initialized");
+    fsr4.calibrate();
+  }
+}
+
+void initializeCommunication()
+{
+  // Load WiFi credentials from NVS, falling back to Config.h defaults if none stored
+  bool fromNVS = WiFi_Credentials::load(wifiSSID, sizeof(wifiSSID),
+                                        wifiPassword, sizeof(wifiPassword));
+  if (fromNVS)
+  {
+    Serial.println("[WiFi] Using NVS-stored credentials");
+  }
+  else
+  {
+    Serial.println("[WiFi] Using compile-time fallback credentials");
+  }
+
+  // Initialize WiFi
+  Serial.println("[WiFi] Connecting...");
+  if (wifiManager.begin(wifiSSID, wifiPassword))
+  {
+    wifiManager.setServerURL(SERVER_URL);
+    wifiManager.enableAutoReconnect(true);
+    Serial.println("✓ WiFi connected");
+    Serial.println("✓ WiFi connected - Ready to send data!");
+  }
+  else
+  {
+    Serial.println("✗ WiFi connection failed (will retry automatically)");
+  }
+
+  // Initialize emergency communication system
+  if (emergencyComms.begin())
+  {
+    emergencyComms.setMaxRetries(EMERGENCY_MAX_RETRIES);
+    emergencyComms.setRetryInterval(EMERGENCY_RETRY_INTERVAL_MS);
+    Serial.println("✓ Emergency communication system ready");
+  }
+}
+
+void readSensors()
+{
+  tracePostAccel("readSensors-start");
+  currentSensorData.timestamp = millis();
+  currentSensorData.valid = true;
+  bool imuValid = false;
+  uint32_t now = currentSensorData.timestamp;
+
+  // Read IMU (MPU6050)
+  if (imuSensor.isInitialized())
+  {
+    tracePostAccel("before-imu-read");
+    float temp;
+    imuValid = imuSensor.readData(currentSensorData.accel_x,
+                                  currentSensorData.accel_y,
+                                  currentSensorData.accel_z,
+                                  currentSensorData.gyro_x,
+                                  currentSensorData.gyro_y,
+                                  currentSensorData.gyro_z,
+                                  temp);
+    tracePostAccel("after-imu-read");
+
+    // Check for sensor failure: readData() sets initialized=false on an I2C
+    // transport failure, so check that flag rather than the returned values.
+    if (!imuSensor.isInitialized())
+    {
+      static uint32_t lastReinitAttempt = 0;
+      uint32_t now = millis();
+
+      // Cooldown: don't attempt reinit more than once every 2 seconds.
+      // Loose wiring can cause rapid successive failures; without a cooldown
+      // multiple reinits stack up and corrupt the library's internal I2C state.
+      if (now - lastReinitAttempt >= 2000)
+      {
+        lastReinitAttempt = now;
+        Serial.println("WARNING: MPU6050 not responding - attempting reinitialization...");
+        logManager.log(LOG_LEVEL_ERROR, LOG_CAT_SENSOR,
+                       "MPU6050 failure detected - reinitializing");
+
+        if (imuSensor.begin())
+        {
+          delay(50); // Let sensor settle before first read
+          imuSensor.configure();
+          Serial.println("✓ MPU6050 reinitialized successfully");
+          imuValid = false;
+        }
+        else
+        {
+          Serial.println("ERROR: MPU6050 reinitialization failed!");
+          imuValid = false;
+        }
+      }
+    }
+  }
+  else
+  {
+    currentSensorData.accel_x = 0;
+    currentSensorData.accel_y = 0;
+    currentSensorData.accel_z = 1.0; // 1g gravity
+    currentSensorData.gyro_x = 0;
+    currentSensorData.gyro_y = 0;
+    currentSensorData.gyro_z = 0;
+    imuValid = false;
+  }
+
+  if (!imuValid)
+  {
+    currentSensorData.valid = false;
+  }
+  tracePostAccel("after-imu-block");
+
+  // Read pressure sensor (BMP280)
+  static uint32_t lastPressureRead = 0;
+  static uint32_t lastPressureReinitAttempt = 0;
+  if (pressureSensor.isInitialized())
+  {
+    if (lastPressureRead == 0 || (now - lastPressureRead) >= BMP280_READ_INTERVAL_MS)
+    {
+      tracePostAccel("before-bmp-read");
+      lastPressureRead = now;
+
+      float temp, pressure, altitude;
+      if (pressureSensor.readData(temp, pressure, altitude))
+      {
+        currentSensorData.pressure = pressure;
+      }
+      else if (!pressureSensor.isInitialized() && (now - lastPressureReinitAttempt) >= 2000)
+      {
+        lastPressureReinitAttempt = now;
+        Serial.println("WARNING: BMP280 not responding - attempting reinitialization...");
+        logManager.log(LOG_LEVEL_ERROR, LOG_CAT_SENSOR,
+                       "BMP280 failure detected - reinitializing");
+
+        if (pressureSensor.begin())
+        {
+          delay(50);
+          pressureSensor.configure();
+          pressureSensor.resetBaselineAltitude();
+          Serial.println("✓ BMP280 reinitialized successfully");
+        }
+        else
+        {
+          Serial.println("ERROR: BMP280 reinitialization failed!");
+        }
+      }
+      tracePostAccel("after-bmp-read");
+    }
+  }
+  else if ((now - lastPressureReinitAttempt) >= 2000)
+  {
+    lastPressureReinitAttempt = now;
+    Serial.println("WARNING: BMP280 offline - attempting reinitialization...");
+    logManager.log(LOG_LEVEL_ERROR, LOG_CAT_SENSOR,
+                   "BMP280 offline - reinitializing");
+
+    if (pressureSensor.begin())
+    {
+      delay(50);
+      pressureSensor.configure();
+      pressureSensor.resetBaselineAltitude();
+      Serial.println("✓ BMP280 reinitialized successfully");
+    }
+    else
+    {
+      Serial.println("ERROR: BMP280 reinitialization failed!");
+    }
+
+    currentSensorData.pressure = 1013.25;
+  }
+  else
+  {
+    currentSensorData.pressure = 1013.25; // Sea level pressure
+  }
+  tracePostAccel("after-bmp-block");
+
+  // Zero out heart rate fields (sensor removed)
+  currentSensorData.heart_rate = 0;
+  currentSensorData.spo2 = 0;
+  currentSensorData.heart_rate_temperature = 0.0f;
+
+  // Read FSR4 force sensor
+  if (fsr4.isInitialized())
+  {
+    tracePostAccel("before-fsr-read");
+    currentSensorData.fsr_values[3] = fsr4.readRaw();
+    // Use FSR4 value for impact detection
+    currentSensorData.fsr_value = currentSensorData.fsr_values[3];
+    tracePostAccel("after-fsr-read");
+  }
+  else
+  {
+    currentSensorData.fsr_values[3] = 0;
+    currentSensorData.fsr_value = 0;
+  }
+  tracePostAccel("readSensors-end");
+}
+
+void handleFallDetected()
+{
+  alertActive = true;
+
+  Serial.println("\n!!! FALL DETECTED !!!");
+
+  // Update confidence scorer with actual measured values from the fall detector
+  confidenceScorer.resetScore();
+  confidenceScorer.startScoring();
+
+  // Stage 1: Free fall — use measured duration and minimum accel magnitude during fall
+  float freefallDuration = fallDetector.getFreefallDuration();
+  confidenceScorer.addStage1Score(freefallDuration, fallDetector.getMinAcceleration());
+
+  // Stage 2: Impact — use actual peak impact and FSR reading
+  float impact_g = fallDetector.getMaxImpact();
+  bool fsrImpact = (currentSensorData.fsr_value > FSR_IMPACT_THRESHOLD);
+  confidenceScorer.addStage2Score(impact_g, (float)fallDetector.getImpactTiming(), fsrImpact);
+
+  // Stage 3: Rotation — use actual peak angular velocity
+  float maxRotation = fallDetector.getMaxRotation();
+  confidenceScorer.addStage3Score(maxRotation, fallDetector.getOrientationChange());
+
+  // Stage 4: Inactivity — use actual measured inactivity duration
+  confidenceScorer.addStage4Score(fallDetector.getInactivityDuration(), fallDetector.isPositionStable());
+
+  // Stage 5 filters to reduce false positives.
+  confidenceScorer.addPressureFilterScore(fabsf(pressureSensor.getAltitudeChange()));
+  bool strapSecure = fsr4.isInitialized() &&
+                     currentSensorData.fsr_value > (uint16_t)(fsr4.getBaseline() / 2);
+  confidenceScorer.addFSRFilterScore(fsrImpact, strapSecure);
+
+  // Get confidence score from fall detector
+  uint8_t confidence = confidenceScorer.getTotalScore();
+
+  Serial.print("Confidence Score: ");
+  Serial.print(confidence);
+  Serial.println("/100");
+
+  // Log the fall event and flush immediately so it reaches the server ASAP
+  logManager.log(LOG_LEVEL_WARN, LOG_CAT_FALL_DETECTION, "FALL DETECTED",
+                 (float)confidence, (float)HIGH_CONFIDENCE_THRESHOLD);
+  logManager.flushImmediate();
+
+  // Prepare emergency data
+  EmergencyData_t emergencyData;
+  emergencyData.timestamp = millis();
+  emergencyData.confidence = confidenceScorer.getConfidenceLevel();
+  emergencyData.confidence_score = confidence;
+  emergencyData.battery_level = readBatteryLevel();
+  emergencyData.sos_triggered = false;
+  strncpy(emergencyData.device_id, deviceID, sizeof(emergencyData.device_id));
+
+  // Copy sensor history from fall detector ring buffer
+  uint8_t histCount = fallDetector.getHistoryCount();
+  if (histCount > 0)
+  {
+    memcpy(emergencyData.sensor_history, fallDetector.getSensorHistory(),
+           histCount * sizeof(SensorData_t));
+  }
+
+  // Activate alerts based on confidence
+  if (confidence >= HIGH_CONFIDENCE_THRESHOLD)
+  {
+    Serial.println("HIGH CONFIDENCE FALL - Immediate Alert");
+    activateFullAlert(true);
+  }
+  else if (confidence >= CONFIRMED_THRESHOLD)
+  {
+    Serial.println("CONFIRMED FALL - Delayed Alert");
+    activateFullAlert(false);
+  }
+
+  // Persist fall to flash before any network attempt — guarantees delivery
+  // even if the device loses power or WiFi is unavailable right now.
+  fallStore.save(emergencyData);
+
+  // Send emergency alert via WiFi
+  Serial.println("\n--- Transmitting Emergency Alert ---");
+
+  // Audio announcement
+  if (AUDIO_ENABLE_VOICE_ALERTS)
+  {
+    audioManager.playVoiceAlert(VOICE_ALERT_CALLING_HELP);
+  }
+
+  bool sent = emergencyComms.sendEmergencyAlert(emergencyData);
+
+  if (sent)
+  {
+    Serial.println("✓ Emergency alert transmitted successfully");
+    fallStore.remove(emergencyData.timestamp); // Clean up — no longer needed on flash
+    if (AUDIO_ENABLE_VOICE_ALERTS)
+    {
+      delay(500);
+      audioManager.playVoiceAlert(VOICE_ALERT_HELP_SENT);
+    }
+  }
+  else
+  {
+    Serial.println("⚠ Emergency alert saved to flash — will retry when WiFi available");
+    audioManager.playWarningTone();
+  }
+
+  // Print detailed fall information
+  fallDetector.printStageDetails();
+  confidenceScorer.printScoreBreakdown();
+
+  // Start non-blocking countdown — loop() will handle expiry and SOS checks
+  Serial.println("\n--- Countdown: Press SOS to confirm or wait to cancel ---");
+  alertCountdownEnd = millis() + ((uint32_t)COUNTDOWN_DURATION_S * 1000);
+  countdownActive = true;
+
+  // Reset detector immediately after latching emergency data.
+  fallDetector.resetDetection();
+}
+
+void handleSOSButton()
+{
+  alertActive = true;
+
+  Serial.println("\n!!! SOS BUTTON PRESSED !!!");
+
+  // Play SOS audio sequence
+  audioManager.playSOSSequence();
+
+  // Prepare emergency data
+  EmergencyData_t emergencyData;
+  emergencyData.timestamp = millis();
+  emergencyData.confidence = CONFIDENCE_HIGH;
+  emergencyData.confidence_score = MAX_CONFIDENCE_SCORE;
+  emergencyData.battery_level = readBatteryLevel();
+  emergencyData.sos_triggered = true; // Manual trigger
+  strncpy(emergencyData.device_id, deviceID, sizeof(emergencyData.device_id));
+
+  // Activate alerts immediately
+  activateFullAlert(true);
+
+  // Audio announcement
+  if (AUDIO_ENABLE_VOICE_ALERTS)
+  {
+    audioManager.playVoiceAlert(VOICE_ALERT_CALLING_HELP);
+  }
+
+  // Send emergency alert
+  bool sent = emergencyComms.sendEmergencyAlert(emergencyData);
+
+  if (sent && AUDIO_ENABLE_VOICE_ALERTS)
+  {
+    delay(500);
+    audioManager.playVoiceAlert(VOICE_ALERT_HELP_SENT);
+  }
+
+  sosAlertActive = true;
+  sosAlertEnd = millis() + SOS_ALERT_HOLD_MS;
+}
+
+void activateFullAlert(bool immediate)
+{
+  // Visual alert
+  digitalWrite(VISUAL_ALERT_PIN, HIGH);
+
+  // Audio alert
+  if (immediate)
+  {
+    audioManager.playFallDetectedSequence();
+  }
+  else
+  {
+    audioManager.playPattern(ALERT_PATTERN_URGENT, 2);
+  }
+}
+
+void deactivateFullAlert()
+{
+  digitalWrite(VISUAL_ALERT_PIN, LOW);
+  audioManager.stopPattern();
+}
+
+void updateSystemStatus()
+{
+  systemStatus.wifi_connected = wifiManager.isConnected();
+  systemStatus.battery_percentage = readBatteryLevel();
+  systemStatus.current_status = fallDetector.getCurrentStatus();
+  systemStatus.uptime_ms = millis();
+}
+
+float readBatteryLevel()
+{
+  // Read battery voltage (ESP32 ADC)
+  // Feather V2 has built-in voltage divider on A4 (GPIO 36)
+  float voltage = analogRead(BATTERY_SENSE_PIN) * (3.3 / 4095.0) * 2.0;
+
+  // Convert to percentage (3.0V = 0%, 4.2V = 100%)
+  float percentage = (voltage - 3.0) / (4.2 - 3.0) * 100.0;
+  percentage = constrain(percentage, 0.0, 100.0);
+
+  return percentage;
+}
+
+void printSystemInfo()
+{
+  Serial.println("\n========================================");
+  Serial.println("         System Information");
+  Serial.println("========================================");
+  Serial.print("Device ID: ");
+  Serial.println(deviceID);
+  wifiManager.printConnectionInfo();
+  emergencyComms.printStatus();
+  Serial.print("Audio System: ");
+  Serial.println(audioManager.isInitialized() ? "Active" : "Inactive");
+  Serial.print("Audio Volume: ");
+  Serial.print(audioManager.getVolume());
+  Serial.println("%");
+  Serial.println("========================================\n");
+}
+
+void printSensorData()
+{
+  Serial.println("--- Sensor Data ---");
+  Serial.print("Accel (g): ");
+  Serial.print(currentSensorData.accel_x, 2);
+  Serial.print(", ");
+  Serial.print(currentSensorData.accel_y, 2);
+  Serial.print(", ");
+  Serial.println(currentSensorData.accel_z, 2);
+
+  Serial.print("Gyro (°/s): ");
+  Serial.print(currentSensorData.gyro_x, 2);
+  Serial.print(", ");
+  Serial.print(currentSensorData.gyro_y, 2);
+  Serial.print(", ");
+  Serial.println(currentSensorData.gyro_z, 2);
+
+  Serial.print("Pressure: ");
+  Serial.print(currentSensorData.pressure, 2);
+  Serial.println(" hPa");
+
+  Serial.print("FSR4: ");
+  Serial.println(currentSensorData.fsr_values[3]);
+
+  Serial.print("Battery: ");
+  Serial.print(systemStatus.battery_percentage, 1);
+  Serial.println("%");
+
+  Serial.println();
+}

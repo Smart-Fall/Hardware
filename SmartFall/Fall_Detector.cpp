@@ -9,6 +9,7 @@ FallDetector::FallDetector() : current_status(FALL_STATUS_MONITORING),
                                stage1_triggered(false), stage2_triggered(false),
                                stage3_triggered(false), stage4_triggered(false),
                                stage1_exit_candidate_start(0), stage2_last_above_threshold_time(0),
+                               stage4_exit_candidate_start(0), potential_exit_candidate_start(0),
                                history_index(0), history_count(0),
                                freefall_duration(0), min_acceleration_during_fall(10.0f),
                                max_impact_acceleration(0), impact_timing(0),
@@ -243,8 +244,9 @@ void FallDetector::processSensorData(SensorData_t &data)
             potential_fall_start_time = millis();
         }
 
-        // During potential-fall monitoring window, movement recovery cancels alert.
-        if (!checkStage4_Inactivity(data))
+        // During potential-fall monitoring, tolerate small settling movement.
+        // Only sustained strong recovery should cancel the alert candidate.
+        if (!checkPotentialFallPersistence(data))
         {
             if (DEBUG_ALGORITHM_STEPS)
             {
@@ -429,27 +431,82 @@ bool FallDetector::checkStage4_Inactivity(SensorData_t &data)
             stage4_triggered = true;
             inactivity_start_time = millis();
         }
+        stage4_exit_candidate_start = 0;
         position_stable = true;
         return true;
     }
 
     if (stage4_triggered)
     {
-        // Any significant movement after inactivity indicates recovery.
+        // Any significant movement after inactivity indicates genuine recovery.
         if ((total_accel > INACTIVITY_RECOVERY_ACCEL_G) ||
             (angular_mag > INACTIVITY_RECOVERY_ANGULAR_DPS))
         {
             stage4_triggered = false;
+            stage4_exit_candidate_start = 0;
             position_stable = false;
             return false;
         }
 
-        // Do not keep Stage 4 latched when inactivity condition is broken.
+        // Debounce exits: require sustained non-inactivity before resetting.
+        // Sensor noise, breathing, and micro-tremors can briefly push readings
+        // outside the inactivity band without indicating actual recovery.
+        if (stage4_exit_candidate_start == 0)
+        {
+            stage4_exit_candidate_start = millis();
+            return true; // Keep Stage 4 active during debounce
+        }
+
+        if ((millis() - stage4_exit_candidate_start) < STAGE4_EXIT_DEBOUNCE_MS)
+        {
+            return true; // Still within debounce window, stay active
+        }
+
+        // Sustained non-inactivity beyond debounce — genuine exit
         stage4_triggered = false;
+        stage4_exit_candidate_start = 0;
         position_stable = false;
         return false;
     }
 
+    return false;
+}
+
+bool FallDetector::checkPotentialFallPersistence(SensorData_t &data)
+{
+    float total_accel = calculateTotalAcceleration(data);
+    float angular_mag = calculateAngularMagnitude(data);
+
+    bool is_inactive = (total_accel > 0.8f && total_accel < 1.2f) &&
+                       (angular_mag < 50.0f);
+    bool strong_recovery = (total_accel > POTENTIAL_RECOVERY_ACCEL_G) ||
+                           (angular_mag > POTENTIAL_RECOVERY_ANGULAR_DPS);
+
+    if (is_inactive)
+    {
+        potential_exit_candidate_start = 0;
+        return true;
+    }
+
+    if (!strong_recovery)
+    {
+        // Mild repositioning, breathing, or settling should not cancel the alert.
+        potential_exit_candidate_start = 0;
+        return true;
+    }
+
+    if (potential_exit_candidate_start == 0)
+    {
+        potential_exit_candidate_start = millis();
+        return true;
+    }
+
+    if ((millis() - potential_exit_candidate_start) < POTENTIAL_FALL_EXIT_DEBOUNCE_MS)
+    {
+        return true;
+    }
+
+    potential_exit_candidate_start = 0;
     return false;
 }
 
@@ -502,6 +559,8 @@ void FallDetector::resetStageVariables()
     stage4_triggered = false;
     stage1_exit_candidate_start = 0;
     stage2_last_above_threshold_time = 0;
+    stage4_exit_candidate_start = 0;
+    potential_exit_candidate_start = 0;
     potential_fall_start_time = 0;
 
     freefall_duration = 0;

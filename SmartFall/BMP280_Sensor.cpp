@@ -3,6 +3,7 @@
 
 BMP280_Sensor::BMP280_Sensor(uint8_t sda, uint8_t scl)
     : initialized(false),
+      i2c_address(0x76),
       sda_pin(sda == 255 ? Board_Config::getSDA() : sda),
       scl_pin(scl == 255 ? Board_Config::getSCL() : scl),
       baselineAltitude(0.0), seaLevelPressure(1013.25)
@@ -13,35 +14,32 @@ bool BMP280_Sensor::begin(uint8_t address)
 {
     // Wire.begin() is called once globally in initializeSensors().
     // Re-calling it here would reset the I2C bus and break all other sensors.
-    // Try primary address with retries
-    for (uint8_t attempt = 0; attempt < MAX_RETRIES; attempt++)
-    {
-        if (bmp.begin(address))
-        {
-            initialized = true;
-            return true;
-        }
-        if (attempt < MAX_RETRIES - 1)
-        {
-            Serial.printf("[BMP280] Init retry %d/%d for address 0x%02X\n", attempt + 1, MAX_RETRIES, address);
-            delay(RETRY_DELAY_MS);
-        }
-    }
+    initialized = false;
 
-    // Try alternate address with retries
-    uint8_t alt_address = (address == 0x76) ? 0x77 : 0x76;
-    for (uint8_t attempt = 0; attempt < MAX_RETRIES; attempt++)
+    // Try both addresses with limited retries. Each failed I2C transaction
+    // incurs a wire timeout; too many back-to-back attempts at 80MHz CPU
+    // can trigger the ESP32 Task Watchdog (TG1WDT_SYS_RESET).
+    static const uint8_t INIT_RETRIES = 3;
+    uint8_t addresses[2] = {address, (uint8_t)((address == 0x76) ? 0x77 : 0x76)};
+
+    for (uint8_t a = 0; a < 2; a++)
     {
-        if (bmp.begin(alt_address))
+        for (uint8_t attempt = 0; attempt < INIT_RETRIES; attempt++)
         {
-            initialized = true;
-            Serial.printf("[BMP280] Initialized at alternate address 0x%02X\n", alt_address);
-            return true;
-        }
-        if (attempt < MAX_RETRIES - 1)
-        {
-            Serial.printf("[BMP280] Init retry %d/%d for address 0x%02X\n", attempt + 1, MAX_RETRIES, alt_address);
-            delay(RETRY_DELAY_MS);
+            yield(); // Feed watchdog between I2C transactions
+            if (bmp.begin(addresses[a]))
+            {
+                initialized = true;
+                i2c_address = addresses[a];
+                if (a > 0)
+                    Serial.printf("[BMP280] Initialized at alternate address 0x%02X\n", addresses[a]);
+                return true;
+            }
+            if (attempt < INIT_RETRIES - 1)
+            {
+                Serial.printf("[BMP280] Init retry %d/%d for address 0x%02X\n", attempt + 1, INIT_RETRIES, addresses[a]);
+                delay(RETRY_DELAY_MS);
+            }
         }
     }
 
@@ -82,49 +80,24 @@ bool BMP280_Sensor::readData(float &temperature, float &pressure, float &altitud
     if (!initialized)
         return false;
 
-    for (uint8_t attempt = 0; attempt < MAX_RETRIES; attempt++)
+    Wire.beginTransmission(i2c_address);
+    if (Wire.endTransmission() != 0)
     {
-        try
-        {
-            temperature = bmp.readTemperature();
-            pressure = bmp.readPressure() / 100.0; // Pa to hPa
-            altitude = bmp.readAltitude(seaLevelPressure);
-
-            // Check for stale data (same pressure = sensor frozen)
-            // Use epsilon comparison — float equality is unreliable for ADC noise
-            if (fabsf(pressure - last_pressure) < 0.01f) {
-                stale_count++;
-                if (stale_count >= STALE_THRESHOLD) {
-                    Serial.printf("[BMP280] Stale data detected after %d identical reads, resetting sensor...\n", STALE_THRESHOLD);
-                    stale_count = 0;
-                    // Reset by reinitializing
-                    begin();
-                    return false;  // Discard this read, retry on next call
-                }
-            } else {
-                stale_count = 0;  // Reset counter if data changed
-                last_pressure = pressure;
-            }
-
-            return true;
-        }
-        catch (...)
-        {
-            // I2C communication error occurred
-            if (attempt < MAX_RETRIES - 1)
-            {
-                Serial.printf("[BMP280] I2C error on attempt %d/%d, retrying...\n", attempt + 1, MAX_RETRIES);
-                delay(RETRY_DELAY_MS);
-            }
-            else
-            {
-                Serial.printf("[BMP280] I2C error - all %d retry attempts failed\n", MAX_RETRIES);
-                return false;
-            }
-        }
+        initialized = false;
+        return false;
     }
 
-    return false;
+    temperature = bmp.readTemperature();
+    pressure = bmp.readPressure() / 100.0; // Pa to hPa
+    altitude = bmp.readAltitude(seaLevelPressure);
+
+    if (!isfinite(temperature) || !isfinite(pressure) || !isfinite(altitude) || pressure <= 0.0f)
+    {
+        initialized = false;
+        return false;
+    }
+
+    return true;
 }
 
 float BMP280_Sensor::getAltitudeChange()
