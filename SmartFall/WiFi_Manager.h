@@ -44,6 +44,7 @@ public:
     bool sendTestMessage(const String &message);
     bool sendJSON(const String &jsonPayload);
     bool sendJSONToEndpoint(const String &path, const String &jsonPayload);
+    String getFromEndpoint(const String &path);
 
     // Utility
     void printConnectionInfo();
@@ -53,6 +54,8 @@ public:
 private:
     bool beginHTTP(HTTPClient &http, const String &url);
     bool isHTTPS(const String &url);
+    void addDeviceAuthHeader(HTTPClient &http);
+    bool isHTTPSuccess(int httpStatusCode);
 };
 
 #endif // WIFI_MANAGER_H

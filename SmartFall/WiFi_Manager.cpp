@@ -10,6 +10,19 @@ WiFi_Manager::WiFi_Manager()
     reconnectFailCount = 0;
 }
 
+void WiFi_Manager::addDeviceAuthHeader(HTTPClient &http)
+{
+    if (strlen(DEVICE_API_KEY) > 0)
+    {
+        http.addHeader("X-Device-Api-Key", DEVICE_API_KEY);
+    }
+}
+
+bool WiFi_Manager::isHTTPSuccess(int httpStatusCode)
+{
+    return httpStatusCode >= 200 && httpStatusCode < 300;
+}
+
 bool WiFi_Manager::isHTTPS(const String &url)
 {
     return url.startsWith("https://") || url.startsWith("HTTPS://");
@@ -35,20 +48,24 @@ bool WiFi_Manager::begin(const char *wifi_ssid, const char *wifi_password)
 
     WiFi.mode(WIFI_STA);
 
-    for (uint8_t attempt = 0; attempt < MAX_RETRIES; attempt++)
+    // Keep startup responsive: before first successful connection,
+    // try a single quick attempt and rely on loop-based auto-reconnect later.
+    const uint8_t maxAttempts = initialized ? MAX_RETRIES : 1;
+
+    for (uint8_t attempt = 0; attempt < maxAttempts; attempt++)
     {
         Serial.print("Connecting to WiFi: ");
         Serial.print(ssid);
         if (attempt > 0)
         {
-            Serial.printf(" (attempt %d/%d)", attempt + 1, MAX_RETRIES);
+            Serial.printf(" (attempt %d/%d)", attempt + 1, maxAttempts);
         }
         Serial.println();
 
         WiFi.begin(wifi_ssid, wifi_password);
 
         unsigned long startTime = millis();
-        while (WiFi.status() != WL_CONNECTED && millis() - startTime < 10000)
+        while (WiFi.status() != WL_CONNECTED && millis() - startTime < WIFI_TIMEOUT_MS)
         {
             delay(500);
             Serial.print(".");
@@ -68,15 +85,16 @@ bool WiFi_Manager::begin(const char *wifi_ssid, const char *wifi_password)
             Serial.print("WiFi power save: ");
             Serial.println(WIFI_POWER_SAVE_MODE == WIFI_PS_MAX_MODEM ? "MAX_MODEM" : "MIN_MODEM");
             initialized = true;
-            if (logManager.isReady()) {
+            if (logManager.isReady())
+            {
                 logManager.log(LOG_LEVEL_INFO, LOG_CAT_WIFI, "WiFi connected");
             }
             return true;
         }
 
-        if (attempt < MAX_RETRIES - 1)
+        if (attempt < maxAttempts - 1)
         {
-            Serial.printf("[WiFi] Connection failed, retry %d/%d...\n", attempt + 1, MAX_RETRIES);
+            Serial.printf("[WiFi] Connection failed, retry %d/%d...\n", attempt + 1, maxAttempts);
             WiFi.disconnect();
             delay(RETRY_DELAY_MS);
         }
@@ -84,7 +102,8 @@ bool WiFi_Manager::begin(const char *wifi_ssid, const char *wifi_password)
 
     Serial.println("[WiFi] Failed to connect - all retries failed");
     initialized = false;
-    if (logManager.isReady()) {
+    if (logManager.isReady())
+    {
         logManager.log(LOG_LEVEL_ERROR, LOG_CAT_WIFI, "WiFi connection failed");
     }
     return false;
@@ -180,10 +199,11 @@ bool WiFi_Manager::sendTestMessage(const String &message)
         HTTPClient http;
         beginHTTP(http, serverURL);
         http.addHeader("Content-Type", "text/plain");
+        addDeviceAuthHeader(http);
 
         int httpResponseCode = http.POST(message);
 
-        if (httpResponseCode > 0)
+        if (isHTTPSuccess(httpResponseCode))
         {
             Serial.print("HTTP Response code: ");
             Serial.println(httpResponseCode);
@@ -194,6 +214,7 @@ bool WiFi_Manager::sendTestMessage(const String &message)
             return true;
         }
 
+        Serial.printf("[WiFi] sendTestMessage HTTP status %d on attempt %d/%d\n", httpResponseCode, attempt + 1, HTTP_MAX_RETRIES);
         Serial.printf("[WiFi] sendTestMessage error %d on attempt %d/%d\n", httpResponseCode, attempt + 1, HTTP_MAX_RETRIES);
         http.end();
 
@@ -229,10 +250,11 @@ bool WiFi_Manager::sendJSON(const String &jsonPayload)
         HTTPClient http;
         beginHTTP(http, serverURL);
         http.addHeader("Content-Type", "application/json");
+        addDeviceAuthHeader(http);
 
         int httpResponseCode = http.POST(jsonPayload);
 
-        if (httpResponseCode > 0)
+        if (isHTTPSuccess(httpResponseCode))
         {
             Serial.print("HTTP Response code: ");
             Serial.println(httpResponseCode);
@@ -243,6 +265,7 @@ bool WiFi_Manager::sendJSON(const String &jsonPayload)
             return true;
         }
 
+        Serial.printf("[WiFi] sendJSON HTTP status %d on attempt %d/%d\n", httpResponseCode, attempt + 1, HTTP_MAX_RETRIES);
         Serial.printf("[WiFi] sendJSON error %d on attempt %d/%d\n", httpResponseCode, attempt + 1, HTTP_MAX_RETRIES);
         http.end();
 
@@ -306,10 +329,11 @@ bool WiFi_Manager::sendJSONToEndpoint(const String &path, const String &jsonPayl
         HTTPClient http;
         beginHTTP(http, fullURL);
         http.addHeader("Content-Type", "application/json");
+        addDeviceAuthHeader(http);
 
         int httpResponseCode = http.POST(jsonPayload);
 
-        if (httpResponseCode > 0)
+        if (isHTTPSuccess(httpResponseCode))
         {
             Serial.print("HTTP Response code: ");
             Serial.println(httpResponseCode);
@@ -320,8 +344,9 @@ bool WiFi_Manager::sendJSONToEndpoint(const String &path, const String &jsonPayl
             return true;
         }
 
-        Serial.printf("[WiFi] sendJSONToEndpoint error %d on attempt %d/%d\n", httpResponseCode, attempt + 1, HTTP_MAX_RETRIES);
-        if (logManager.isReady()) {
+        Serial.printf("[WiFi] sendJSONToEndpoint HTTP status %d on attempt %d/%d\n", httpResponseCode, attempt + 1, HTTP_MAX_RETRIES);
+        if (logManager.isReady())
+        {
             logManager.log(LOG_LEVEL_WARN, LOG_CAT_WIFI, "HTTP send error",
                            (float)httpResponseCode, (float)(attempt + 1));
         }
@@ -335,6 +360,36 @@ bool WiFi_Manager::sendJSONToEndpoint(const String &path, const String &jsonPayl
 
     Serial.println("[WiFi] sendJSONToEndpoint failed - all retries failed");
     return false;
+}
+
+String WiFi_Manager::getFromEndpoint(const String &path)
+{
+    if (!isConnected() || serverURL.length() == 0)
+        return "";
+
+    String fullURL = serverURL + path;
+
+    for (uint8_t attempt = 0; attempt < HTTP_MAX_RETRIES; attempt++)
+    {
+        HTTPClient http;
+        beginHTTP(http, fullURL);
+        addDeviceAuthHeader(http);
+
+        int httpResponseCode = http.GET();
+
+        if (httpResponseCode == 200)
+        {
+            String response = http.getString();
+            http.end();
+            return response;
+        }
+
+        http.end();
+        if (attempt < HTTP_MAX_RETRIES - 1)
+            delay(HTTP_RETRY_DELAY_MS);
+    }
+
+    return "";
 }
 
 String WiFi_Manager::getLocalIP()

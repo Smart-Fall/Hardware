@@ -7,15 +7,19 @@ Comprehensive overview of the SmartFall multi-stage fall detection algorithm des
 SmartFall uses a **staged decision tree approach** rather than a single mathematical equation to provide:
 
 ### 1. Interpretable Logic Flow
+
 Each stage has clear, understandable detection criteria that can be validated independently. This makes debugging easier and builds confidence in the system.
 
 ### 2. Memory Efficiency
+
 A decision tree approach requires minimal memory compared to complex machine learning models, suitable for microcontroller constraints.
 
 ### 3. Tunable Thresholds
+
 All detection parameters live in `Config.h` and can be adjusted without recompilation, enabling quick optimization with real-world data.
 
 ### 4. Multiple Validation Stages
+
 Sequential stages act as validators for each other, reducing false positives while maintaining responsiveness.
 
 ## Processing Flow
@@ -24,7 +28,7 @@ The complete algorithm operates in a continuous loop:
 
 ```mermaid
 graph TD
-    A["Sensor Data Acquisition<br/>100Hz Sampling"] --> B["SOS Button Check<br/>Highest Priority"]
+   A["Sensor Data Acquisition<br/>50Hz Sampling"] --> B["SOS Button Check<br/>Highest Priority"]
     B --> C{SOS Pressed?}
     C -->|Yes| D["Trigger Emergency<br/>Alert Immediately"]
     C -->|No| E["5-Stage Fall<br/>Detection Pipeline"]
@@ -38,10 +42,10 @@ graph TD
     J --> K["Confidence Scoring<br/>& Thresholds"]
     K --> L{Confidence<br/>Score?}
 
-    L -->|≥76 pts| M["HIGH CONFIDENCE<br/>Immediate Alert"]
-    L -->|67-75 pts| N["CONFIRMED FALL<br/>5s Delay Alert"]
-    L -->|48-66 pts| O["POTENTIAL FALL<br/>Enhanced Monitoring"]
-    L -->|30-47 pts| P["SUSPICIOUS ACTIVITY<br/>Normal Monitoring"]
+   L -->|>=65 pts| M["HIGH CONFIDENCE<br/>Immediate Alert"]
+   L -->|55-64 pts| N["CONFIRMED FALL<br/>5s Delay Alert"]
+   L -->|38-54 pts| O["POTENTIAL FALL<br/>Enhanced Monitoring"]
+   L -->|20-37 pts| P["SUSPICIOUS ACTIVITY<br/>Normal Monitoring"]
     L -->|<30 pts| Q["NO FALL<br/>Continue Baseline"]
 
     M --> R["Multi-Modal Alerts<br/>Audio/Haptic/Visual"]
@@ -59,16 +63,19 @@ graph TD
 ## Timing Architecture
 
 ### Sensor Data Acquisition
-- **Frequency**: 100 Hz (10ms intervals)
+
+- **Frequency**: 50 Hz (20ms intervals)
 - **Latency**: <5ms from sensor reading to algorithm processing
 - **Resolution**: Sufficient to capture fall dynamics
 
 ### Detection Window
+
 - **Primary**: 10 seconds of active analysis
 - **Extended**: Additional 10 seconds in enhanced monitoring
 - **History Buffer**: Maintains last 100 samples (~1 second)
 
 ### Alert Response
+
 - **Detection to First Alert**: <2 seconds
 - **Alert Duration**: 5 seconds siren + 25 seconds wait
 - **Total Response Window**: 30 seconds
@@ -90,6 +97,7 @@ timeline
 ```
 
 Each stage **confirms the previous** one:
+
 - No Stage 1 detected → **Not a fall**
 - No Stage 2 after Stage 1 → **Not a fall**
 - No Stage 3-4 sequence → **Possible false positive**
@@ -122,6 +130,7 @@ graph TD
 ```
 
 **How Stages Work Together:**
+
 - **Stage 1** is the entry point - without free fall detection, no fall is detected
 - **Stage 2** validates Stage 1 by detecting impact after the free fall
 - **Stage 3** confirms uncontrolled motion (not a controlled catch)
@@ -134,14 +143,14 @@ Instead of binary yes/no decisions, SmartFall accumulates **confidence points** 
 
 ### Maximum Points per Stage
 
-| Stage | Max Points | Focus |
-|-------|-----------|-------|
-| **Stage 1** | 25 pts | Free fall detection |
-| **Stage 2** | 25 pts | Impact confirmation |
-| **Stage 3** | 20 pts | Rotation validation |
-| **Stage 4** | 20 pts | Incapacity duration |
-| **Stage 5** | 15 pts | False positive filtering |
-| **TOTAL** | **105 pts** | Comprehensive score |
+| Stage       | Max Points  | Focus                    |
+| ----------- | ----------- | ------------------------ |
+| **Stage 1** | 25 pts      | Free fall detection      |
+| **Stage 2** | 25 pts      | Impact confirmation      |
+| **Stage 3** | 20 pts      | Rotation validation      |
+| **Stage 4** | 20 pts      | Incapacity duration      |
+| **Stage 5** | 15 pts      | False positive filtering |
+| **TOTAL**   | **105 pts** | Comprehensive score      |
 
 ### Scoring Formula
 
@@ -149,10 +158,10 @@ Instead of binary yes/no decisions, SmartFall accumulates **confidence points** 
 Total Confidence = Σ(Stage Points) + Σ(Filter Points)
 
 Then classify:
-├─ ≥76 pts:  HIGH CONFIDENCE → Immediate alert
-├─ 67-75 pts: CONFIRMED → 5-second delay
-├─ 48-66 pts: POTENTIAL → Monitor 10 more seconds
-├─ 30-47 pts: SUSPICIOUS → Continue normal monitoring
+├─ >=65 pts:  HIGH CONFIDENCE → Immediate alert
+├─ 55-64 pts: CONFIRMED → 5-second delay
+├─ 38-54 pts: POTENTIAL → Monitor 10 more seconds
+├─ 20-37 pts: SUSPICIOUS → Continue normal monitoring
 └─ <30 pts:   NO FALL → Reset
 ```
 
@@ -231,29 +240,34 @@ During window:
 SmartFall prevents false alarms through:
 
 ### 1. Sequential Validation
+
 Each stage must be triggered in order. A fall without free fall isn't detected.
 
 ### 2. Timing Constraints
+
 Stages must occur within specific time windows (free fall then impact within 1 second).
 
 ### 3. Multi-Sensor Confirmation
+
 Secondary sensors (pressure, heart rate, FSR) validate primary motion sensors.
 
 ### 4. Movement Recognition
+
 Post-fall movement detection triggers immediate alert cancellation.
 
 ### 5. Physiological Validation
+
 Heart rate and blood oxygen changes correlate with actual emergency vs device drop.
 
 ## Performance Targets
 
-| Metric | Target | Status |
-|--------|--------|--------|
-| **Detection Sensitivity** | >95% for true falls | Achieved |
-| **False Positive Rate** | <5% | Optimized |
-| **Detection Latency** | <2 seconds | Achievable |
-| **Battery Impact** | <5% per day | Achieved |
-| **CPU Utilization** | <5% | Verified |
+| Metric                    | Target              | Status     |
+| ------------------------- | ------------------- | ---------- |
+| **Detection Sensitivity** | >95% for true falls | Achieved   |
+| **False Positive Rate**   | <5%                 | Optimized  |
+| **Detection Latency**     | <2 seconds          | Achievable |
+| **Battery Impact**        | <5% per day         | Achieved   |
+| **CPU Utilization**       | <5%                 | Verified   |
 
 ## Next Steps
 

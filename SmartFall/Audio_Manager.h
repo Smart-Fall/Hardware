@@ -37,6 +37,7 @@ private:
     uint8_t pwmChannel;
     uint8_t volume; // 0-100
     bool initialized;
+    bool _isMuted = false;
 
     static const uint8_t MAX_RETRIES = AUDIO_MAX_RETRIES;
     static const uint16_t RETRY_DELAY_MS = AUDIO_RETRY_DELAY_MS;
@@ -73,6 +74,8 @@ public:
     // Control
     void stopPattern();
     void silence();
+    void setMute(bool muted);
+    bool getMute() const;
 };
 
 #endif // AUDIO_MANAGER_H

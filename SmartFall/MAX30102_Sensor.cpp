@@ -28,24 +28,24 @@ MAX30102Sensor::MAX30102Sensor(uint8_t sda, uint8_t scl)
 
 bool MAX30102Sensor::begin(uint8_t address)
 {
-    #ifdef MAX30102_USE_UART
-        // Initialize UART
-        Serial1.begin(MAX30102_UART_BAUD, SERIAL_8N1, rx_pin, tx_pin);
-        Serial.println("========================================");
-        Serial.println("  MAX30102 UART Mode (Modbus RTU)");
-        Serial.println("========================================");
-        Serial.print("RX Pin: GPIO ");
-        Serial.println(rx_pin);
-        Serial.print("TX Pin: GPIO ");
-        Serial.println(tx_pin);
-        Serial.print("Baud:   ");
-        Serial.println(MAX30102_UART_BAUD);
-        Serial.println("========================================\n");
-        delay(100);
-    #else
-        // I2C bus already initialized by the main sketch before sensors begin()
-        Serial.println("MAX30102 I2C Mode");
-    #endif
+#ifdef MAX30102_USE_UART
+    // Initialize UART
+    Serial1.begin(MAX30102_UART_BAUD, SERIAL_8N1, rx_pin, tx_pin);
+    Serial.println("========================================");
+    Serial.println("  MAX30102 UART Mode (Modbus RTU)");
+    Serial.println("========================================");
+    Serial.print("RX Pin: GPIO ");
+    Serial.println(rx_pin);
+    Serial.print("TX Pin: GPIO ");
+    Serial.println(tx_pin);
+    Serial.print("Baud:   ");
+    Serial.println(MAX30102_UART_BAUD);
+    Serial.println("========================================\n");
+    delay(100);
+#else
+    // I2C bus already initialized by the main sketch before sensors begin()
+    Serial.println("MAX30102 I2C Mode");
+#endif
 
     // Initialize sensor with retries
     for (uint8_t attempt = 0; attempt < MAX_RETRIES; attempt++)
@@ -53,29 +53,30 @@ bool MAX30102Sensor::begin(uint8_t address)
         if (heartRateSensor.begin())
         {
             initialized = true;
-            #ifdef MAX30102_USE_UART
-                Serial.println("[MAX30102] ✓ Initialized (UART mode)");
-            #else
-                Serial.println("[MAX30102] ✓ Initialized (I2C mode)");
-            #endif
+#ifdef MAX30102_USE_UART
+            Serial.println("[MAX30102] ✓ Initialized (UART mode)");
+#else
+            Serial.println("[MAX30102] ✓ Initialized (I2C mode)");
+#endif
 
             startCollection();
             delay(100);
             return true;
         }
-        if (attempt < MAX_RETRIES - 1) {
+        if (attempt < MAX_RETRIES - 1)
+        {
             Serial.printf("[MAX30102] Init retry %d/%d\n", attempt + 1, MAX_RETRIES);
             delay(RETRY_DELAY_MS);
         }
     }
 
-    #ifdef MAX30102_USE_UART
-        Serial.println("ERROR: MAX30102 init failed (UART mode)");
-        Serial.println("Check: UART wiring, power, sensor mode, baud rate");
-    #else
-        Serial.println("ERROR: MAX30102 init failed (I2C mode)");
-        Serial.println("Check: I2C wiring, power, address 0x57");
-    #endif
+#ifdef MAX30102_USE_UART
+    Serial.println("ERROR: MAX30102 init failed (UART mode)");
+    Serial.println("Check: UART wiring, power, sensor mode, baud rate");
+#else
+    Serial.println("ERROR: MAX30102 init failed (I2C mode)");
+    Serial.println("Check: I2C wiring, power, address 0x57");
+#endif
 
     initialized = false;
     return false;
@@ -97,8 +98,8 @@ bool MAX30102Sensor::readData(uint16_t &heart_rate, uint8_t &spo2, float &temper
 
     uint32_t currentTime = millis();
 
-    // Sensor updates every 4 seconds per documentation
-    if (currentTime - last_read_time < 4000)
+    // Keep a bounded read interval so vitals can contribute during fall detection.
+    if (currentTime - last_read_time < MAX30102_MIN_READ_INTERVAL_MS)
     {
         return false; // No new data yet
     }
@@ -117,17 +118,21 @@ bool MAX30102Sensor::readData(uint16_t &heart_rate, uint8_t &spo2, float &temper
             temperature = heartRateSensor.getTemperature_C();
 
             // Check for stale data (same heart rate = sensor frozen)
-            if (heart_rate == last_heart_rate && heart_rate != 0) {
+            if (heart_rate == last_heart_rate && heart_rate != 0)
+            {
                 stale_count++;
-                if (stale_count >= STALE_THRESHOLD) {
+                if (stale_count >= STALE_THRESHOLD)
+                {
                     Serial.printf("[MAX30102] Stale data detected after %d identical reads, resetting sensor...\n", STALE_THRESHOLD);
                     stale_count = 0;
                     // Reset by reinitializing
                     begin();
-                    return false;  // Discard this read, retry on next call
+                    return false; // Discard this read, retry on next call
                 }
-            } else {
-                stale_count = 0;  // Reset counter if data changed
+            }
+            else
+            {
+                stale_count = 0; // Reset counter if data changed
                 last_heart_rate = heart_rate;
             }
 
@@ -300,21 +305,21 @@ void MAX30102Sensor::printInfo()
 
     Serial.println("\n--- MAX30102 Sensor Info ---");
 
-    #ifdef MAX30102_USE_UART
-        Serial.println("Mode: UART (Modbus RTU)");
-        Serial.print("Pins: RX=GPIO ");
-        Serial.print(rx_pin);
-        Serial.print(", TX=GPIO ");
-        Serial.println(tx_pin);
-        Serial.print("Baud: ");
-        Serial.println(MAX30102_UART_BAUD);
-    #else
-        Serial.println("Mode: I2C");
-        Serial.print("Pins: SDA=GPIO ");
-        Serial.print(sda_pin);
-        Serial.print(", SCL=GPIO ");
-        Serial.println(scl_pin);
-    #endif
+#ifdef MAX30102_USE_UART
+    Serial.println("Mode: UART (Modbus RTU)");
+    Serial.print("Pins: RX=GPIO ");
+    Serial.print(rx_pin);
+    Serial.print(", TX=GPIO ");
+    Serial.println(tx_pin);
+    Serial.print("Baud: ");
+    Serial.println(MAX30102_UART_BAUD);
+#else
+    Serial.println("Mode: I2C");
+    Serial.print("Pins: SDA=GPIO ");
+    Serial.print(sda_pin);
+    Serial.print(", SCL=GPIO ");
+    Serial.println(scl_pin);
+#endif
 
     Serial.print("Baseline HR: ");
     Serial.print(baseline_heart_rate);

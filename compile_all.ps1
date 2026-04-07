@@ -20,7 +20,8 @@ $logFileAccessible = $true
 try {
     $logStream = [System.IO.File]::Open($LOG_FILE, [System.IO.FileMode]::OpenOrCreate, [System.IO.FileAccess]::ReadWrite, [System.IO.FileShare]::None)
     $logStream.Close()
-} catch {
+}
+catch {
     Write-Host "Error: compile_all.log is in use by another process. Please close any program using it and try again."
     exit 1
 }
@@ -43,14 +44,16 @@ $MAIN_SKETCH = Join-Path $ROOT_DIR 'SmartFall.ino'
 if (Test-Path $MAIN_SKETCH) {
     Write-Host "Compiling main SmartFall.ino..."
     "Compiling main SmartFall.ino..." | Out-File -FilePath $LOG_FILE -Append
-    try {
-        arduino-cli compile --fqbn $FQBN $ROOT_DIR *>> $LOG_FILE
+    arduino-cli compile --fqbn $FQBN $ROOT_DIR *>> $LOG_FILE
+    if ($LASTEXITCODE -eq 0) {
         "Main SmartFall.ino compiled successfully." | Out-File -FilePath $LOG_FILE -Append
-    } catch {
+    }
+    else {
         "Main SmartFall.ino compilation failed." | Out-File -FilePath $LOG_FILE -Append
         $anyFail = $true
     }
-} else {
+}
+else {
     "Main SmartFall.ino not found." | Out-File -FilePath $LOG_FILE -Append
     $anyFail = $true
 }
@@ -76,10 +79,11 @@ if (Test-Path $TESTS_DIR) {
             $jobs += Start-Job -ScriptBlock {
                 param($FQBN, $TEST_SUBDIR, $SKETCH_NAME, $SUBDIR_NAME, $tempLogFile)
                 $result = $true
-                try {
-                    arduino-cli compile --fqbn $FQBN $TEST_SUBDIR *>> $tempLogFile
+                arduino-cli compile --fqbn $FQBN $TEST_SUBDIR *>> $tempLogFile
+                if ($LASTEXITCODE -eq 0) {
                     "$SKETCH_NAME in $SUBDIR_NAME compiled successfully." | Out-File -FilePath $tempLogFile -Append
-                } catch {
+                }
+                else {
                     "$SKETCH_NAME in $SUBDIR_NAME compilation failed." | Out-File -FilePath $tempLogFile -Append
                     $result = $false
                 }
@@ -104,7 +108,8 @@ if (Test-Path $TESTS_DIR) {
     
     # Clean up temp log directory
     Remove-Item $tempLogDir -Recurse -Force
-} else {
+}
+else {
     "Tests directory not found." | Out-File -FilePath $LOG_FILE -Append
     $anyFail = $true
 }
@@ -112,7 +117,8 @@ if (Test-Path $TESTS_DIR) {
 if ($anyFail) {
     Write-Host "One or more compilations failed. See $LOG_FILE for details."
     exit 1
-} else {
+}
+else {
     Write-Host "All compilations succeeded. See $LOG_FILE for details."
     exit 0
 }

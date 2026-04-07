@@ -7,11 +7,13 @@ Detailed specification of the 5-stage fall detection pipeline with scoring table
 **Purpose**: Detect the weightlessness phase during a fall
 
 **Trigger Condition**:
+
 - Total acceleration magnitude < 0.5g for duration ≥ 200ms
 
 ### Free Fall Physics
 
 When a person falls freely:
+
 - Gravity pulls down at 9.8 m/s² (1g)
 - In free fall, there's no supporting force
 - Net acceleration ≈ 0g (weightless)
@@ -21,13 +23,14 @@ When a person falls freely:
 
 #### Duration Scoring (Time spent falling)
 
-| Duration | Points | Interpretation |
-|----------|--------|-----------------|
-| < 200ms | 5 pts | Brief drop (possibly stumble) |
-| 200-500ms | 10 pts | Typical fall duration |
-| > 500ms | 15 pts | Extended fall (high structure) |
+| Duration  | Points | Interpretation                 |
+| --------- | ------ | ------------------------------ |
+| < 200ms   | 5 pts  | Brief drop (possibly stumble)  |
+| 200-500ms | 10 pts | Typical fall duration          |
+| > 500ms   | 15 pts | Extended fall (high structure) |
 
 **Timing Formula**:
+
 ```
 If freefall_duration >= 500ms:  award 15 points
 Else if freefall_duration >= 200ms: award 10 points
@@ -37,13 +40,14 @@ Else:                               trigger not met
 
 #### Magnitude Scoring (How close to zero)
 
-| Acceleration | Points | Interpretation |
-|--------------|--------|-----------------|
-| 0.3-0.5g | 5 pts | Partial weightlessness (tumbling) |
-| 0.1-0.3g | 8 pts | Significant weightlessness |
-| < 0.1g | 10 pts | True free fall condition |
+| Acceleration | Points | Interpretation                    |
+| ------------ | ------ | --------------------------------- |
+| 0.3-0.5g     | 5 pts  | Partial weightlessness (tumbling) |
+| 0.1-0.3g     | 8 pts  | Significant weightlessness        |
+| < 0.1g       | 10 pts | True free fall condition          |
 
 **Physics Reference**:
+
 ```
 Stationary:     1.0g (gravity only)
 Free fall:      0.0g (ideal)
@@ -73,11 +77,13 @@ Status: Stage 1 TRIGGERED → Proceed to Stage 2
 **Purpose**: Confirm ground impact following free fall phase
 
 **Trigger Condition**:
-- Peak acceleration > 3.0g occurring within 1 second of Stage 1 trigger
+
+- Peak acceleration > 2.0g occurring within 1.5 seconds of Stage 1 trigger
 
 ### Impact Physics
 
 When free fall ends with ground impact:
+
 - Sudden deceleration from ~7 m/s to ~0 m/s
 - Occurs over ~100-300ms contact time
 - Peak acceleration: 3-10g depending on surface and body part
@@ -86,13 +92,14 @@ When free fall ends with ground impact:
 
 #### Impact Magnitude (Force of collision)
 
-| Acceleration | Points | Surface Type |
-|--------------|--------|--------------|
-| 3.0-4.0g | 8 pts | Carpet, foam, grass |
-| 4.0-6.0g | 12 pts | Wood, tile, concrete |
-| > 6.0g | 15 pts | Hard surface, high velocity |
+| Acceleration | Points | Surface Type                |
+| ------------ | ------ | --------------------------- |
+| 2.0-4.0g     | 8 pts  | Carpet, foam, grass         |
+| 4.0-6.0g     | 12 pts | Wood, tile, concrete        |
+| > 6.0g       | 15 pts | Hard surface, high velocity |
 
 **Impact Reference Table**:
+
 ```
 Speed before impact vs. impact acceleration
 Fall height  Velocity    Peak Accel    Points
@@ -104,18 +111,18 @@ Fall height  Velocity    Peak Accel    Points
 
 #### Timing Accuracy (Was impact immediate?)
 
-| Timing | Points | Interpretation |
-|--------|--------|-----------------|
-| < 0.5s after free fall | 5 pts | Direct ground contact |
-| 0.5-1.0s after free fall | 3 pts | Delayed impact |
-| > 1.0s after free fall | 0 pts | Not part of same event |
+| Timing                   | Points | Interpretation         |
+| ------------------------ | ------ | ---------------------- |
+| < 0.5s after free fall   | 5 pts  | Direct ground contact  |
+| 0.5-1.0s after free fall | 3 pts  | Delayed impact         |
+| > 1.0s after free fall   | 0 pts  | Not part of same event |
 
 #### FSR Validation (Device impact confirmation)
 
-| Condition | Points | Notes |
-|-----------|--------|-------|
-| FSR pressure spike during impact | 7 pts | Device struck ground |
-| No FSR spike | 0 pts | Device may have missed impact |
+| Condition                        | Points | Notes                         |
+| -------------------------------- | ------ | ----------------------------- |
+| FSR pressure spike during impact | 7 pts  | Device struck ground          |
+| No FSR spike                     | 0 pts  | Device may have missed impact |
 
 ### Example: Fall Hitting Hard Floor
 
@@ -125,7 +132,7 @@ T=400ms: Head/body hits floor (8g acceleration spike)
 T=401ms: FSR shows pressure spike (5000 units)
 
 Trigger Analysis:
-├─ Acceleration: 8g → Exceeds 3.0g threshold → Stage 2 TRIGGERED
+├─ Acceleration: 8g → Exceeds 2.0g threshold → Stage 2 TRIGGERED
 ├─ Impact magnitude: 8g falls in >6.0g bracket → 15 pts
 ├─ Timing: 400-150 = 250ms = <0.5s → 5 pts
 └─ FSR validation: Pressure spike detected → 7 pts
@@ -138,35 +145,39 @@ Stage 2 Score: 15 + 5 + 7 = 27 pts (capped at 25 max)
 **Purpose**: Validate abnormal body rotation indicative of uncontrolled fall
 
 **Trigger Condition**:
+
 - Angular velocity magnitude > 150°/s during Stages 1-2 timeframe
 
 ### Rotation Physics
 
 In a controlled fall (catching yourself):
+
 - Minimal rotational motion
 - Body stays upright
 
 In an uncontrolled fall:
+
 - Body rotates as it falls
 - Angular velocities: 200-600°/s typical
 - Multiple axes of rotation
 
 !!! warning "Threshold Discrepancy"
-    Config.h specifies `ROTATION_THRESHOLD_DPS = 150.0f`
-    The specification document shows 250°/s
-    **Use Config.h value (150°/s) as authoritative**
+Config.h specifies `ROTATION_THRESHOLD_DPS = 150.0f`
+The specification document shows 250°/s
+**Use Config.h value (150°/s) as authoritative**
 
 ### Scoring Breakdown
 
 #### Rotational Velocity (Spin speed)
 
-| Angular Velocity | Points | Scenario |
-|------------------|--------|----------|
-| 150-400°/s | 8 pts | Moderate rotation |
-| 400-600°/s | 12 pts | Significant rotation |
-| > 600°/s | 15 pts | Severe rotation |
+| Angular Velocity | Points | Scenario             |
+| ---------------- | ------ | -------------------- |
+| 150-400°/s       | 8 pts  | Moderate rotation    |
+| 400-600°/s       | 12 pts | Significant rotation |
+| > 600°/s         | 15 pts | Severe rotation      |
 
 **Reference**:
+
 ```
 A 180° rotation in:
 - 500ms → 360°/s (high spin rate)
@@ -175,10 +186,10 @@ A 180° rotation in:
 
 #### Final Orientation Change (How far did body rotate?)
 
-| Orientation Shift | Points | Recovery |
-|-------------------|--------|----------|
-| 45-90° change | 3 pts | Partial rotation |
-| > 90° change | 5 pts | Major inversion |
+| Orientation Shift | Points | Recovery         |
+| ----------------- | ------ | ---------------- |
+| 45-90° change     | 3 pts  | Partial rotation |
+| > 90° change      | 5 pts  | Major inversion  |
 
 ### Example: Spinning Fall on Stairs
 
@@ -202,16 +213,19 @@ Status: High rotation confirmed → Likely uncontrolled fall
 **Purpose**: Confirm user inability to recover immediately after impact
 
 **Trigger Condition**:
+
 - Acceleration within 0.8g-1.2g for duration ≥ 2 seconds
 - Angular velocity < 50°/s during same period
 
 ### Recovery Physics
 
 After a fall, people typically:
+
 - Try to get up (high motion) → False positive avoidance
 - Lie still from injury → True fall indicator
 
 Stable acceleration range (0.8-1.2g) indicates:
+
 - Static position on ground
 - No significant movement
 - Device orientation stable
@@ -220,23 +234,24 @@ Stable acceleration range (0.8-1.2g) indicates:
 
 #### Inactivity Duration (How long motionless?)
 
-| Duration | Points | Severity |
-|----------|--------|----------|
-| 2-5 seconds | 8 pts | Brief incapacitation |
+| Duration     | Points | Severity                |
+| ------------ | ------ | ----------------------- |
+| 2-5 seconds  | 8 pts  | Brief incapacitation    |
 | 5-10 seconds | 12 pts | Moderate incapacitation |
 | > 10 seconds | 15 pts | Extended incapacitation |
 
 **Interpretation**:
+
 - 2-5 sec: Person might be dazed, gathering strength
 - 5-10 sec: Significant injury, unable to rise quickly
 - 10+ sec: Severe injury, loss of consciousness possible
 
 #### Movement Stability (Is person completely still?)
 
-| Motion Pattern | Points | Analysis |
-|----------------|--------|----------|
-| Minimal micro-movements | 5 pts | Complete stillness |
-| No stability | 0 pts | Person moving/recovering |
+| Motion Pattern          | Points | Analysis                 |
+| ----------------------- | ------ | ------------------------ |
+| Minimal micro-movements | 5 pts  | Complete stillness       |
+| No stability            | 0 pts  | Person moving/recovering |
 
 ### Example: Lying on Floor After Fall
 
@@ -267,13 +282,14 @@ Status: Person unable to stand → Confirmed incapacity
 
 #### Altitude Change Scoring
 
-| Altitude Change | Points | Scenario |
-|-----------------|--------|----------|
-| 0.5-1.0m drop | 2 pts | Single-story fall |
-| 1.0-2.0m drop | 3 pts | Two-story fall |
-| > 2.0m drop | 5 pts | High elevation fall |
+| Altitude Change | Points | Scenario            |
+| --------------- | ------ | ------------------- |
+| 0.5-1.0m drop   | 2 pts  | Single-story fall   |
+| 1.0-2.0m drop   | 3 pts  | Two-story fall      |
+| > 2.0m drop     | 5 pts  | High elevation fall |
 
 **Physics Reference**:
+
 ```
 From standing on stairs:  0.5m drop → 1-2 pts
 From bed/chair:           0.5m drop → 1-2 pts
@@ -286,22 +302,23 @@ From second story window: 4m drop → 5 pts (max)
 
 #### Heart Rate Response Scoring
 
-| HR Change from Baseline | Points | Analysis |
-|-------------------------|--------|----------|
-| > 40 BPM increase | 8 pts | Strong panic/stress |
-| 20-40 BPM increase | 5 pts | Moderate response |
-| 10-20 BPM increase | 2 pts | Mild response |
-| No change | 0 pts | No physiological stress |
+| HR Change from Baseline | Points | Analysis                |
+| ----------------------- | ------ | ----------------------- |
+| > 40 BPM increase       | 8 pts  | Strong panic/stress     |
+| 20-40 BPM increase      | 5 pts  | Moderate response       |
+| 10-20 BPM increase      | 2 pts  | Mild response           |
+| No change               | 0 pts  | No physiological stress |
 
 #### SpO2 (Blood Oxygen) Scoring
 
-| Oxygen Level | Points | Status |
-|--------------|--------|--------|
-| ≥ 90% | 5 pts | Healthy saturation |
-| 85-90% | 2 pts | Slightly reduced |
-| < 85% | -3 pts | Concerning (may inhibit alert) |
+| Oxygen Level | Points | Status                         |
+| ------------ | ------ | ------------------------------ |
+| ≥ 90%        | 5 pts  | Healthy saturation             |
+| 85-90%       | 2 pts  | Slightly reduced               |
+| < 85%        | -3 pts | Concerning (may inhibit alert) |
 
 **Interpretation**:
+
 - High HR + good SpO2 = Panic from fall (positive)
 - Low HR + good SpO2 = Device drop (negative)
 - Low HR + low SpO2 = Medical emergency (positive)
@@ -312,22 +329,22 @@ From second story window: 4m drop → 5 pts (max)
 
 #### FSR Validation Scoring
 
-| Condition | Points | Notes |
-|-----------|--------|-------|
-| Consistent strap tension throughout | 2 pts | Device stayed on |
-| Pressure spike during impact phase | 3 pts | Impact confirmed |
-| Lost contact (FSR drops to zero) | -5 pts | Device removed/dropped |
+| Condition                           | Points | Notes                  |
+| ----------------------------------- | ------ | ---------------------- |
+| Consistent strap tension throughout | 2 pts  | Device stayed on       |
+| Pressure spike during impact phase  | 3 pts  | Impact confirmed       |
+| Lost contact (FSR drops to zero)    | -5 pts | Device removed/dropped |
 
 ## Scoring Summary Table
 
-| Stage | Max Points | Primary Sensor | Validation |
-|-------|-----------|-----------------|-----------|
-| **1: Free Fall** | 25 | MPU6050 Accel | Duration + magnitude |
-| **2: Impact** | 25 | MPU6050 Accel | Timing + FSR |
-| **3: Rotation** | 20 | MPU6050 Gyro | Magnitude + angle |
-| **4: Inactivity** | 20 | MPU6050 (all axes) | Duration + stability |
-| **5: Filters** | 15 | BMP280, MAX30102, FSR | Multi-sensor validation |
-| **TOTAL** | **105** | Multi-sensor fusion | Confidence threshold |
+| Stage             | Max Points | Primary Sensor        | Validation              |
+| ----------------- | ---------- | --------------------- | ----------------------- |
+| **1: Free Fall**  | 25         | MPU6050 Accel         | Duration + magnitude    |
+| **2: Impact**     | 25         | MPU6050 Accel         | Timing + FSR            |
+| **3: Rotation**   | 20         | MPU6050 Gyro          | Magnitude + angle       |
+| **4: Inactivity** | 20         | MPU6050 (all axes)    | Duration + stability    |
+| **5: Filters**    | 15         | BMP280, MAX30102, FSR | Multi-sensor validation |
+| **TOTAL**         | **105**    | Multi-sensor fusion   | Confidence threshold    |
 
 ## Next Steps
 

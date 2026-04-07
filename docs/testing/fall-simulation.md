@@ -4,12 +4,12 @@ Methods for testing the complete fall detection system without actual falls.
 
 ## Test Methods Overview
 
-| Method | Safety | Realism | Difficulty |
-|--------|--------|---------|-----------|
-| **SOS Button** | ✓ Safest | ✗ No detection | ✓ Easy |
-| **Acceleration Simulation** | ✓ Safe | ◐ Moderate | ◐ Medium |
-| **Controlled Drop** | ◐ Careful | ✓ Very realistic | ✗ Difficult |
-| **Serial Command** | ✓ Safest | ✗ None | ✓ Easy |
+| Method                      | Safety    | Realism          | Difficulty  |
+| --------------------------- | --------- | ---------------- | ----------- |
+| **SOS Button**              | ✓ Safest  | ✗ No detection   | ✓ Easy      |
+| **Acceleration Simulation** | ✓ Safe    | ◐ Moderate       | ◐ Medium    |
+| **Controlled Drop**         | ◐ Careful | ✓ Very realistic | ✗ Difficult |
+| **Serial Command**          | ✓ Safest  | ✗ None           | ✓ Easy      |
 
 ## Method 1: SOS Button Test
 
@@ -52,6 +52,7 @@ Methods for testing the complete fall detection system without actual falls.
 ### Cancelation
 
 To cancel alert without movement:
+
 - Press SOS button again, OR
 - Trigger significant movement
 
@@ -78,7 +79,7 @@ To cancel alert without movement:
 T=0ms:    Start with device in hand
 T=100ms:  Rapidly lower device (acceleration < 0.5g)
 T=300ms:  Continue lowering (simulate free fall duration)
-T=400ms:  Stop motion and slap device onto table (acceleration > 3g)
+T=400ms:  Stop motion and slap device onto table (acceleration > 2g)
 T=500ms:  Keep device still on surface
 T=2500ms: Continue stillness (2+ seconds)
 Result:   Confidence score accumulates → Alert triggers
@@ -103,7 +104,7 @@ Expected: Confidence 65-75 pts → CONFIRMED_FALL → 5s delay alert
 [02500ms] Stage 4: Inactivity confirmed (duration: 2s) → +16pts
 [02600ms] Stage 5: Altitude change (0.5m drop) → +3pts
 [02610ms] ────────────────────────────────────
-[02610ms] TOTAL CONFIDENCE: 64 pts → POTENTIAL_FALL
+[02610ms] TOTAL CONFIDENCE: 50 pts → POTENTIAL_FALL
 [02610ms] Enhanced monitoring enabled for 10 more seconds...
 [02620ms] If no recovery → Escalate to alert
 ```
@@ -114,12 +115,7 @@ Expected: Confidence 65-75 pts → CONFIRMED_FALL → 5s delay alert
 
 ### Safety Precautions
 
-!!! danger "Important"
-    - Use low heights (0.5-1.0 meter)
-    - Drop onto soft surface (bed, couch, mat)
-    - Protect device with padding
-    - Never drop from high heights
-    - Protect hands and body
+!!! danger "Important" - Use low heights (0.5-1.0 meter) - Drop onto soft surface (bed, couch, mat) - Protect device with padding - Never drop from high heights - Protect hands and body
 
 ### Test Setup
 
@@ -233,10 +229,11 @@ arduino-cli monitor -p PORT -c baudrate=115200
 ```
 
 In serial monitor, send commands:
+
 ```
 1 → Add Stage 1 (15pts) → Total: 15
 2 → Add Stage 2 (20pts) → Total: 35
-3 → Add Stage 3 (15pts) → Total: 50 (POTENTIAL_FALL threshold!)
+3 → Add Stage 3 (15pts) → Total: 50 (POTENTIAL_FALL threshold)
 4 → Add Stage 4 (18pts) → Total: 68 (CONFIRMED_FALL!)
 5 → Add filters (12pts) → Total: 80 (HIGH_CONFIDENCE!)
 s → Print current score
@@ -248,6 +245,7 @@ r → Reset to 0
 After running fall simulations, verify:
 
 ### Detection Pipeline
+
 - [ ] Stage 1 (Free Fall) triggers correctly
 - [ ] Stage 2 (Impact) confirms free fall
 - [ ] Stage 3 (Rotation) detects spinning
@@ -255,6 +253,7 @@ After running fall simulations, verify:
 - [ ] Stage 5 (Filters) validates with secondary sensors
 
 ### Confidence Scoring
+
 - [ ] Points accumulate correctly
 - [ ] Thresholds trigger at correct scores:
   - [ ] ≥76 = HIGH_CONFIDENCE
@@ -264,6 +263,7 @@ After running fall simulations, verify:
   - [ ] <30 = NO_FALL
 
 ### Alerts
+
 - [ ] Audio alert triggers:
   - [ ] Immediate for HIGH_CONFIDENCE (≥76)
   - [ ] After 5s for CONFIRMED (67-75)
@@ -272,12 +272,14 @@ After running fall simulations, verify:
 - [ ] Multiple patterns play
 
 ### Communication
+
 - [ ] WiFi alert sent to server
 - [ ] Server responds with 200 OK
 - [ ] BLE alert sent to mobile app
 - [ ] Both succeed at least partially
 
 ### User Interface
+
 - [ ] LED indicator blinks
 - [ ] Serial debug output clear
 - [ ] 30-second countdown starts

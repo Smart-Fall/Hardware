@@ -272,6 +272,35 @@ bool Emergency_Comms::isBLEConnected() {
     return (ble_server != nullptr && ble_server->isConnected());
 }
 
+void Emergency_Comms::pollCommands(Audio_Manager* audioManager, const char* device_id) {
+    if (!wifi_manager || !wifi_manager->isConnected() || !audioManager)
+        return;
+
+    String path = String("/api/device/commands?device_id=") + device_id;
+    String response = wifi_manager->getFromEndpoint(path);
+
+    if (response.length() == 0)
+        return;
+
+    // Parse "mute" field from JSON response
+    int muteIdx = response.indexOf("\"mute\"");
+    if (muteIdx < 0)
+        return;
+
+    int colonIdx = response.indexOf(':', muteIdx);
+    if (colonIdx < 0)
+        return;
+
+    // Skip whitespace after colon
+    int valStart = colonIdx + 1;
+    while (valStart < (int)response.length() && response[valStart] == ' ')
+        valStart++;
+
+    bool mute = response.substring(valStart, valStart + 4) == "true";
+    if (audioManager->getMute() != mute)
+        audioManager->setMute(mute);
+}
+
 void Emergency_Comms::printStatus() {
     Serial.println("=== Emergency Communication Status ===");
 

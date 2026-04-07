@@ -4,6 +4,7 @@
 #include <Arduino.h>
 #include "WiFi_Manager.h"
 #include "BLE_Server.h"
+#include "Audio_Manager.h"
 #include "Data_Types.h"
 #include "Config.h"
 
@@ -63,6 +64,7 @@ public:
 
     // Alert management
     void processAlertQueue();  // Call in loop to handle retries
+    void pollCommands(Audio_Manager* audioManager, const char* device_id);  // Poll server for mute/unmute
     AlertStatus_t getAlertStatus();
     bool isAlertPending();
     void clearPendingAlert();

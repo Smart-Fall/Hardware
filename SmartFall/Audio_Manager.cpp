@@ -51,7 +51,7 @@ uint8_t Audio_Manager::getVolume()
 
 void Audio_Manager::playToneInternal(uint16_t frequency, uint32_t duration_ms)
 {
-    if (!initialized || frequency == 0)
+    if (!initialized || frequency == 0 || _isMuted)
         return;
 
     // Calculate duty cycle based on volume (0-255 for 8-bit)
@@ -308,4 +308,18 @@ void Audio_Manager::stopPattern()
 void Audio_Manager::silence()
 {
     ledcWrite(speakerPin, 0);
+}
+
+void Audio_Manager::setMute(bool muted)
+{
+    _isMuted = muted;
+    if (muted)
+        ledcWrite(speakerPin, 0);
+    Serial.print("[Audio] Mute: ");
+    Serial.println(muted ? "ON" : "OFF");
+}
+
+bool Audio_Manager::getMute() const
+{
+    return _isMuted;
 }
