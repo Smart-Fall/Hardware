@@ -119,7 +119,7 @@ void FallDetector::processSensorData(SensorData_t &data)
         break;
 
     case FALL_STATUS_STAGE1_FREEFALL:
-        // Continue monitoring free fall
+        // Continue monitoring free fall and hand off once the free-fall phase completes.
         checkStage1_FreeFall(data);
 
         // Check for impact
@@ -139,9 +139,56 @@ void FallDetector::processSensorData(SensorData_t &data)
                                thresholds.impact_threshold_g);
             }
         }
+        else if (!stage1_triggered && freefall_duration >= FREEFALL_MIN_DURATION_MS)
+        {
+            current_status = FALL_STATUS_STAGE2_IMPACT;
+            if (DEBUG_ALGORITHM_STEPS)
+            {
+                Serial.println("STAGE 2: Awaiting impact after free fall!");
+            }
+            if (logManager.isReady())
+            {
+                logManager.log(LOG_LEVEL_INFO, LOG_CAT_FALL_DETECTION,
+                               "Stage 2: Awaiting impact after free fall",
+                               freefall_duration,
+                               thresholds.impact_threshold_g);
+            }
+        }
         break;
 
     case FALL_STATUS_STAGE2_IMPACT:
+        if (!stage2_triggered)
+        {
+            if (checkStage2_Impact(data))
+            {
+                if (DEBUG_ALGORITHM_STEPS)
+                {
+                    Serial.println("STAGE 2: Impact detected!");
+                }
+                if (logManager.isReady())
+                {
+                    logManager.log(LOG_LEVEL_INFO, LOG_CAT_FALL_DETECTION,
+                                   "Stage 2: Impact detected",
+                                   max_impact_acceleration,
+                                   thresholds.impact_threshold_g);
+                }
+            }
+            else if ((millis() - stage1_start_time) > IMPACT_MAX_DELAY_MS)
+            {
+                if (DEBUG_ALGORITHM_STEPS)
+                {
+                    Serial.println("Impact window expired - resetting detection");
+                }
+                if (logManager.isReady())
+                {
+                    logManager.log(LOG_LEVEL_INFO, LOG_CAT_FALL_DETECTION,
+                                   "Impact window expired - detection reset");
+                }
+                resetDetection();
+            }
+            break;
+        }
+
         // Check for rotation during impact
         if (checkStage3_Rotation(data))
         {
@@ -327,6 +374,8 @@ bool FallDetector::checkStage1_FreeFall(SensorData_t &data)
 
             if (freefall_duration >= FREEFALL_MIN_DURATION_MS)
             {
+                stage1_triggered = false;
+                stage1_exit_candidate_start = 0;
                 return true;
             }
 
@@ -488,20 +537,18 @@ bool FallDetector::checkPotentialFallPersistence(SensorData_t &data)
         return true;
     }
 
-    if (!strong_recovery)
-    {
-        // Mild repositioning, breathing, or settling should not cancel the alert.
-        potential_exit_candidate_start = 0;
-        return true;
-    }
-
     if (potential_exit_candidate_start == 0)
     {
         potential_exit_candidate_start = millis();
         return true;
     }
 
-    if ((millis() - potential_exit_candidate_start) < POTENTIAL_FALL_EXIT_DEBOUNCE_MS)
+    uint32_t elapsed = millis() - potential_exit_candidate_start;
+    uint32_t requiredDuration = strong_recovery
+                                    ? POTENTIAL_FALL_EXIT_DEBOUNCE_MS
+                                    : POTENTIAL_FALL_SOFT_EXIT_DEBOUNCE_MS;
+
+    if (elapsed < requiredDuration)
     {
         return true;
     }

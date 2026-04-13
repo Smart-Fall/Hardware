@@ -99,6 +99,11 @@ static void printHelp()
     Serial.println("JSON provisioning:");
     Serial.println("  {\"identify\":true} or {\"get_status\":true}");
     Serial.println("  {\"set_wifi\":true,\"ssid\":\"YOUR_SSID\",\"password\":\"YOUR_PASS\"}");
+    Serial.println("JSON calibration:");
+    Serial.println("  {\"calibrate_imu\":true}   - Calibrate IMU (keep device still)");
+    Serial.println("  {\"calibrate_fsr\":true}   - Calibrate FSR (remove pressure)");
+    Serial.println("  {\"calibrate_bmp\":true}   - Reset BMP280 baseline altitude");
+    Serial.println("  {\"calibrate_all\":true}   - Run all calibrations");
 }
 
 static void printWiFiStatus()
@@ -518,6 +523,100 @@ static void handleSerialLine(const char *line)
         {
             Serial.println("{\"status\":\"error\",\"message\":\"NVS write failed\"}");
         }
+        return;
+    }
+
+    if (strstr(line, "\"calibrate_imu\""))
+    {
+        if (!imuSensor.isInitialized())
+        {
+            Serial.println("{\"status\":\"error\",\"sensor\":\"imu\",\"message\":\"IMU not initialized\"}");
+            return;
+        }
+        imuSensor.calibrate(100);
+        char resp[256];
+        snprintf(resp, sizeof(resp),
+                 "{\"status\":\"ok\",\"sensor\":\"imu\",\"accel_offset\":[%.4f,%.4f,%.4f],\"gyro_offset\":[%.4f,%.4f,%.4f]}",
+                 imuSensor.getAccelOffsetX(), imuSensor.getAccelOffsetY(), imuSensor.getAccelOffsetZ(),
+                 imuSensor.getGyroOffsetX(), imuSensor.getGyroOffsetY(), imuSensor.getGyroOffsetZ());
+        Serial.println(resp);
+        return;
+    }
+
+    if (strstr(line, "\"calibrate_fsr\""))
+    {
+        if (!fsr4.isInitialized())
+        {
+            Serial.println("{\"status\":\"error\",\"sensor\":\"fsr\",\"message\":\"FSR not initialized\"}");
+            return;
+        }
+        fsr4.calibrate(100);
+        char resp[128];
+        snprintf(resp, sizeof(resp),
+                 "{\"status\":\"ok\",\"sensor\":\"fsr\",\"baseline\":%u}",
+                 fsr4.getBaseline());
+        Serial.println(resp);
+        return;
+    }
+
+    if (strstr(line, "\"calibrate_bmp\""))
+    {
+        if (!pressureSensor.isInitialized())
+        {
+            Serial.println("{\"status\":\"error\",\"sensor\":\"bmp\",\"message\":\"BMP280 not initialized\"}");
+            return;
+        }
+        pressureSensor.resetBaselineAltitude();
+        char resp[128];
+        snprintf(resp, sizeof(resp),
+                 "{\"status\":\"ok\",\"sensor\":\"bmp\",\"baseline_altitude\":%.2f}",
+                 pressureSensor.getBaselineAltitude());
+        Serial.println(resp);
+        return;
+    }
+
+    if (strstr(line, "\"calibrate_all\""))
+    {
+        bool imu_ok = false, fsr_ok = false, bmp_ok = false;
+        float accel[3] = {0}, gyro[3] = {0};
+        uint16_t fsr_baseline = 0;
+        float bmp_altitude = 0;
+
+        if (imuSensor.isInitialized())
+        {
+            imuSensor.calibrate(100);
+            accel[0] = imuSensor.getAccelOffsetX();
+            accel[1] = imuSensor.getAccelOffsetY();
+            accel[2] = imuSensor.getAccelOffsetZ();
+            gyro[0] = imuSensor.getGyroOffsetX();
+            gyro[1] = imuSensor.getGyroOffsetY();
+            gyro[2] = imuSensor.getGyroOffsetZ();
+            imu_ok = true;
+        }
+
+        if (fsr4.isInitialized())
+        {
+            fsr4.calibrate(100);
+            fsr_baseline = fsr4.getBaseline();
+            fsr_ok = true;
+        }
+
+        if (pressureSensor.isInitialized())
+        {
+            pressureSensor.resetBaselineAltitude();
+            bmp_altitude = pressureSensor.getBaselineAltitude();
+            bmp_ok = true;
+        }
+
+        char resp[384];
+        snprintf(resp, sizeof(resp),
+                 "{\"status\":\"ok\",\"imu\":{\"ok\":%s,\"accel_offset\":[%.4f,%.4f,%.4f],\"gyro_offset\":[%.4f,%.4f,%.4f]},"
+                 "\"fsr\":{\"ok\":%s,\"baseline\":%u},"
+                 "\"bmp\":{\"ok\":%s,\"baseline_altitude\":%.2f}}",
+                 imu_ok ? "true" : "false", accel[0], accel[1], accel[2], gyro[0], gyro[1], gyro[2],
+                 fsr_ok ? "true" : "false", fsr_baseline,
+                 bmp_ok ? "true" : "false", bmp_altitude);
+        Serial.println(resp);
         return;
     }
 

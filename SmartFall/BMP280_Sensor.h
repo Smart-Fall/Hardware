@@ -31,6 +31,7 @@ public:
 
     bool readData(float &temperature, float &pressure, float &altitude);
     float getAltitudeChange();
+    float getBaselineAltitude() const { return baselineAltitude; }
 
     bool isInitialized();
     void printInfo();

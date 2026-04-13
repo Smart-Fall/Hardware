@@ -47,6 +47,13 @@ public:
     bool isCalibrated();
     bool isInitialized();
     void printInfo();
+
+    float getGyroOffsetX() const { return gyro_offset_x; }
+    float getGyroOffsetY() const { return gyro_offset_y; }
+    float getGyroOffsetZ() const { return gyro_offset_z; }
+    float getAccelOffsetX() const { return accel_offset_x; }
+    float getAccelOffsetY() const { return accel_offset_y; }
+    float getAccelOffsetZ() const { return accel_offset_z; }
 };
 
 #endif
