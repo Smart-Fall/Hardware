@@ -1,5 +1,6 @@
 #include "WiFi_Manager.h"
 #include "Log_Manager.h"
+#include "WiFi_Credentials.h"
 
 WiFi_Manager::WiFi_Manager()
 {
@@ -12,9 +13,11 @@ WiFi_Manager::WiFi_Manager()
 
 void WiFi_Manager::addDeviceAuthHeader(HTTPClient &http)
 {
-    if (strlen(DEVICE_API_KEY) > 0)
+    char apiKey[DEVICE_API_KEY_MAX_LEN];
+    WiFi_Credentials::loadApiKey(apiKey, sizeof(apiKey));
+    if (strlen(apiKey) > 0)
     {
-        http.addHeader("X-Device-Api-Key", DEVICE_API_KEY);
+        http.addHeader("X-Device-Api-Key", apiKey);
     }
 }
 

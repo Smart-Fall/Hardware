@@ -45,8 +45,8 @@
 #endif
 
 // WiFi Configuration
-#define WIFI_SSID "Your_WiFi_SSID"
-#define WIFI_PASSWORD "Your_WiFi_Password"
+#define WIFI_SSID ""
+#define WIFI_PASSWORD ""
 #define WIFI_TIMEOUT_MS 10000
 #define WIFI_RECONNECT_INTERVAL_MS 30000
 #define WIFI_MAX_RECONNECT_ATTEMPTS 5

@@ -6,7 +6,10 @@
 
 #define NVS_NAMESPACE "wifi_creds"
 #define NVS_KEY_SSID  "ssid"
+#define NVS_KEY_API   "api_key"
 #define NVS_KEY_PASS  "pass"
+
+#define DEVICE_API_KEY_MAX_LEN 65
 
 class WiFi_Credentials {
 public:
@@ -52,6 +55,25 @@ public:
         String s = prefs.getString(NVS_KEY_SSID, String(WIFI_SSID));
         prefs.end();
         return s;
+    }
+
+    // Load the device API key from NVS. Falls back to the compile-time DEVICE_API_KEY.
+    static void loadApiKey(char* keyBuf, size_t keyLen) {
+        Preferences prefs;
+        prefs.begin(NVS_NAMESPACE, true);  // read-only
+        String storedKey = prefs.getString(NVS_KEY_API, DEVICE_API_KEY);
+        prefs.end();
+        strncpy(keyBuf, storedKey.c_str(), keyLen - 1);
+        keyBuf[keyLen - 1] = '\0';
+    }
+
+    // Save the device API key to NVS. Returns true on success.
+    static bool saveApiKey(const char* apiKey) {
+        Preferences prefs;
+        prefs.begin(NVS_NAMESPACE, false);  // read-write
+        bool ok = prefs.putString(NVS_KEY_API, apiKey);
+        prefs.end();
+        return ok;
     }
 
     // Erase stored credentials (factory reset helper).
