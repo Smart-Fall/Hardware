@@ -31,7 +31,7 @@ SmartFall/
 ├── Audio/
 │   └── Audio_Manager.h/cpp       # PAM8302 audio output system
 │
-└── Tests/                        # Component test sketches
+└── tests/                        # Component test sketches
     ├── MPU6050/
     ├── BMP280/
     ├── MAX30102/

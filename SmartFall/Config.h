@@ -70,10 +70,10 @@
 #endif
 
 // WiFi Configuration
-// NOTE: These are compile-time fallback values used only when no credentials
-// are stored in NVS. Use the admin provisioning page to set runtime credentials.
-#define WIFI_SSID "Mohammed network"
-#define WIFI_PASSWORD "87654321"
+// Compile-time fallbacks are intentionally empty. Credentials are provisioned at runtime
+// and stored in NVS (see WiFi_Credentials.h), so no secrets live in source control.
+#define WIFI_SSID ""
+#define WIFI_PASSWORD ""
 #define WIFI_TIMEOUT_MS 10000
 #define WIFI_RECONNECT_INTERVAL_MS 30000       // Interval between reconnect attempts (ms)
 #define WIFI_MAX_RECONNECT_ATTEMPTS 5          // Failures before switching to long backoff
@@ -86,9 +86,9 @@
 #define SENSOR_STREAM_URL SERVER_BASE_URL "/api/device/sensor-stream"
 #define SERVER_PORT 443
 
-// Device API authentication key for backend ingestion endpoints.
-// Set this to the same value as DEVICE_INGEST_API_KEY on the server.
-#define DEVICE_API_KEY "932602e0e8f456a90252e126005bfbbae16b2dc688713552590dfa52709ebd46"
+// Device API key fallback. Empty by default: the key is provisioned at runtime
+// and stored in NVS. Must match DEVICE_INGEST_API_KEY on the server.
+#define DEVICE_API_KEY ""
 
 // BLE Configuration
 #define BLE_DEVICE_NAME "SmartFall"

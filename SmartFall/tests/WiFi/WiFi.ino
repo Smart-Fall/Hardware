@@ -17,9 +17,12 @@
 #include "WiFi_Manager.h"
 #include <HTTPClient.h>
 
-// WiFi Configuration - CHANGE THESE!
-#define WIFI_SSID "Mohammed network"
-#define WIFI_PASSWORD "87654321"
+// WiFi credentials are read at runtime from NVS, the same store the firmware uses.
+// Provision them with the firmware's admin page before running this test.
+#include "../../WiFi_Credentials.h"
+
+char wifiSSID[33];
+char wifiPassword[65];
 #define SENSOR_STREAM_URL "https://smartfall.vercel.app/api/device/sensor-stream" // Sensor data endpoint
 #define SERVER_URL "https://smartfall.vercel.app/api/health" // Production backend
 
@@ -45,6 +48,7 @@ unsigned long startTime = 0;
 
 void setup()
 {
+    WiFi_Credentials::load(wifiSSID, sizeof(wifiSSID), wifiPassword, sizeof(wifiPassword));
     Serial.begin(115200);
     delay(2000);
 
@@ -56,7 +60,7 @@ void setup()
     Serial.println("TEST 1: Scanning Available WiFi Networks");
     Serial.println("-----------------------------------------");
     Serial.print("Looking for SSID: ");
-    Serial.println(WIFI_SSID);
+    Serial.println(wifiSSID);
     Serial.println("Scanning continuously for 30 seconds...\n");
 
     unsigned long scanStartTime = millis();
@@ -96,7 +100,7 @@ void setup()
                 Serial.println();
 
                 // Check if this is our target SSID
-                if (currentSSID == WIFI_SSID)
+                if (currentSSID == wifiSSID)
                 {
                     ssidFound = true;
                 }
@@ -114,7 +118,7 @@ void setup()
     {
         Serial.println("✗ Target SSID not found after 30 seconds!");
         Serial.println("\nPlease check:");
-        Serial.println("1. WiFi SSID is correct: " + String(WIFI_SSID));
+        Serial.println("1. WiFi SSID is correct: " + String(wifiSSID));
         Serial.println("2. WiFi network is powered on and in range");
         Serial.println("3. ESP32 antenna is properly connected");
         Serial.println("\nTest cannot continue without finding target SSID.\n");
@@ -129,7 +133,7 @@ void setup()
     // Test 2: WiFi Connection
     Serial.println("TEST 2: WiFi Connection");
     Serial.println("------------------------");
-    if (wifiManager.begin(WIFI_SSID, WIFI_PASSWORD))
+    if (wifiManager.begin(wifiSSID, wifiPassword))
     {
         Serial.println("✓ WiFi connection successful\n");
 
