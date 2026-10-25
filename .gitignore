@@ -8,3 +8,6 @@ compile_all.log
 site/
 SmartFall_logo.png
 temp_logs
+# Backups and local tool binaries
+*.bak
+bin/
